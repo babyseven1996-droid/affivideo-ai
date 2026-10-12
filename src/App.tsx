@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
-import CreateVideo from './components/CreateVideo'
+import CreateVideo from './CreateVideo'
 import Library from './pages/Library'
 import Referral from './pages/Referral'
 import Analytics from './pages/Analytics'
