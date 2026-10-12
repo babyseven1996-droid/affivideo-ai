@@ -170,12 +170,11 @@ export default function App() {
     fetchSupabaseVideos()
   }, [user])
 
-  // 3. Lưu Video mới lên Supabase
   // 3. Lưu Video mới vào Kho video (Library) & Supabase
   const handleSaveNewVideo = async (title: string, script: string, videoUrl?: string, image?: string) => {
     const chosenImage = image || FALLBACK_PRODUCT_IMAGES[Math.floor(Math.random() * FALLBACK_PRODUCT_IMAGES.length)]
     
-    // Tạo record video mới chuẩn bị đưa vào State để hiện ngay lập tức ở Library
+    // Tạo record video mới chuẩn xác từ tham số truyền vào
     const newVideoRecord: VideoRecord = {
       id: `vid_${Date.now()}`,
       title: title || 'Video sản phẩm mới',
@@ -190,11 +189,11 @@ export default function App() {
       voice: voices[0] || 'Nam miền Bắc trầm ấm',
     } as unknown as VideoRecord
 
-    // 1. Cập nhật ngay vào State giao diện Kho video
+    // 1. Đưa ngay vào danh sách videos để hiển thị tức thì trong Kho video
     setVideos((prev) => [newVideoRecord, ...prev])
     showToast('Đã tạo và lưu video vào Kho video thành công!')
 
-    // 2. Đồng bộ ngầm lên Supabase (nếu đã đăng nhập)
+    // 2. Lưu ngầm lên Supabase (nếu tài khoản đã đăng nhập)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const currentUserId = session?.user?.id || (user as { id?: string })?.id
@@ -214,7 +213,6 @@ export default function App() {
       console.error('Lỗi đồng bộ Supabase:', err)
     }
   }
-
   // 4. Xóa Video khỏi Supabase
   const handleDeleteVideo = async (id: string) => {
     const { data: { session } } = await supabase.auth.getSession()
