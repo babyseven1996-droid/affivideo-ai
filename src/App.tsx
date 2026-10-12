@@ -316,7 +316,36 @@ export default function App() {
           />
         )}
       </main>
+{/* Render Kho video */}
+        {tab === 'library' && (
+          <Library
+            videos={videos}
+            onDelete={handleDeleteVideo}
+            onToast={showToast}
+          />
+        )}
 
+        {/* Render Giới thiệu / Referral */}
+        {tab === 'referral' && (
+          <Referral
+            referral={referral}
+            user={user}
+            onToast={showToast}
+          />
+        )}
+
+        {/* Render Thống kê */}
+        {tab === 'analytics' && (
+          <Analytics />
+        )}
+
+        {/* Render Cài đặt / Giọng nói */}
+        {tab === 'settings' && (
+          <VoiceSettings
+            voices={voices}
+            onToast={showToast}
+          />
+        )}
       <BottomNav active={tab} onChange={setTab} />
 
       {pricingOpen && (
