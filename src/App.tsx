@@ -320,7 +320,7 @@ export default function App() {
         {tab === 'create' && (
           <CreateVideo
             credits={credits}
-            voices={voices}
+            voices={voices || []}
             onVideoCreated={handleSaveNewVideo}
             onSpendCredits={(amount) => {
               setCredits((prev) => {
@@ -336,7 +336,7 @@ export default function App() {
         {/* Tab 2: Kho video */}
         {tab === 'library' && (
           <Library
-            videos={videos}
+            videos={videos || []}
             onDelete={handleDeleteVideo}
             onToast={showToast}
           />
@@ -345,7 +345,7 @@ export default function App() {
         {/* Tab 3: Giới thiệu */}
         {tab === 'referral' && (
           <Referral
-            referral={referral}
+            referral={referral || { code: 'AFFI123', successfulReferrals: 0 }}
             user={user}
             onToast={showToast}
           />
@@ -359,7 +359,7 @@ export default function App() {
         {/* Tab 5: Cài đặt */}
         {tab === 'settings' && (
           <VoiceSettings
-            voices={voices}
+            voices={voices || []}
             onToast={showToast}
           />
         )}
