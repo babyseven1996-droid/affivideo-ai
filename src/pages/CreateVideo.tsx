@@ -4,13 +4,14 @@ import { analyzeMockProduct, createMockScript, TRENDING_TEMPLATES } from '../dat
 import type { ProductPreview } from '../types'
 
 type CreateVideoProps = {
+  credits: number // Truyền trực tiếp số credits hiện tại vào
   voices: string[]
   onVideoCreated: (title: string, script: string, videoUrl?: string, image?: string) => void
   onSpendCredits: (amount: number, action: string) => boolean | void
   onToast: (message: string) => void
 }
 
-export default function CreateVideo({ voices, onVideoCreated, onSpendCredits, onToast }: CreateVideoProps) {
+export default function CreateVideo({ credits, voices, onVideoCreated, onSpendCredits, onToast }: CreateVideoProps) {
   const [link, setLink] = useState('')
   const [voice, setVoice] = useState(voices[0] ?? 'Nam miền Bắc trầm ấm')
   const [phase, setPhase] = useState<'analyzing' | 'rendering' | null>(null)
@@ -32,11 +33,16 @@ export default function CreateVideo({ voices, onVideoCreated, onSpendCredits, on
     onToast(`Đã áp dụng mẫu ${template.title} thành công!`)
   }
 
-  // Bước 1: Phân tích sản phẩm (Khớp đúng mẫu hoặc mock chuẩn)
+  // Bước 1: Phân tích sản phẩm
   function analyzeProduct() {
+    // CHẶN CỨNG 1: Kiểm tra số dư credits ngay lập tức
+    if (credits < 5) {
+      if (onToast) onToast('Bạn đã hết credits! Vui lòng nạp thêm để tiếp tục.')
+      return
+    }
+
     if (onSpendCredits) {
-      const res = onSpendCredits(5, 'phân tích sản phẩm')
-      if (res === false) return // <-- CHẶN NGAY LẬP TỨC NẾU HẾT ĐIỂM
+      onSpendCredits(5, 'phân tích sản phẩm')
     }
 
     setPhase('analyzing')
@@ -73,44 +79,16 @@ export default function CreateVideo({ voices, onVideoCreated, onSpendCredits, on
     }
   }
 
-  // Bước 2: Tạo giọng đọc & xuất video (Lưu vào Supabase & Kho video)
-  function handleGenerateVoiceAndVideo() {
-    if (onSpendCredits) {
-      const res = onSpendCredits(5, 'tạo giọng đọc & xuất video')
-      if (res === false) return // <-- CHẶN NGAY LẬP TỨC NẾU HẾT ĐIỂM
-    }
-
-    setPhase('rendering')
-    setMessage('Đang tổng hợp giọng đọc AI và dựng video...')
-
-    window.setTimeout(() => {
-      setPhase(null)
-      setMessage('Xuất video thành công!')
-
-      if (onToast) {
-        onToast('Đã tạo giọng đọc và xuất video thành công!')
-      }
-
-      if (onVideoCreated && product) {
-        onVideoCreated(
-          product.title || 'Video sản phẩm Affiliate',
-          script || 'Kịch bản video...',
-          'https://example.com/sample-video.mp4',
-          product.image
-        )
-      }
-    }, 2000)
-  }
-
   // Bước 2: Tạo giọng đọc & xuất video
   function handleGenerateVoiceAndVideo() {
-    // CHẶN TẬN GỐC: Nếu không trừ được credits (hết điểm) thì dừng ngay lập tức
+    // CHẶN CỨNG 2: Kiểm tra số dư credits ngay lập tức
+    if (credits < 5) {
+      if (onToast) onToast('Bạn đã hết credits! Vui lòng nạp thêm để tiếp tục.')
+      return
+    }
+
     if (onSpendCredits) {
-      const success = onSpendCredits(5, 'tạo giọng đọc & xuất video')
-      if (success === false) {
-        if (onToast) onToast('Bạn đã hết Credits! Vui lòng nạp thêm để tiếp tục.')
-        return // Dừng lại không cho xuất video
-      }
+      onSpendCredits(5, 'tạo giọng đọc & xuất video')
     }
 
     setPhase('rendering')
@@ -134,6 +112,7 @@ export default function CreateVideo({ voices, onVideoCreated, onSpendCredits, on
       }
     }, 2000)
   }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '900px', margin: '0 auto', paddingBottom: '40px' }}>
       
@@ -319,7 +298,7 @@ export default function CreateVideo({ voices, onVideoCreated, onSpendCredits, on
                 <>
                   <LoaderCircle className="spinner" size={18} /> Đang xuất video...
                 </>
-              ) : (
+              ) : ( 
                 <>
                   Tạo giọng đọc & xuất video <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>5 credits</span> <ArrowRight size={16} />
                 </>
