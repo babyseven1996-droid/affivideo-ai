@@ -132,22 +132,16 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // 2. Fetch danh sách Videos từ Supabase
+  
   // 2. Fetch danh sách Videos từ Supabase
   useEffect(() => {
     async function fetchSupabaseVideos() {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const currentUserId = session?.user?.id || (user as { id?: string })?.id
-
-        let query = supabase.from('videos').select('*').order('created_at', { ascending: false })
-        
-        // Nếu có user thì lọc theo user_id, nếu không thì lấy toàn bộ dữ liệu bảng để hiển thị test
-        if (currentUserId) {
-          query = query.eq('user_id', currentUserId)
-        }
-
-        const { data, error } = await query
+        // Lấy trực tiếp toàn bộ danh sách video từ bảng videos để hiển thị ngay vào Kho video
+        const { data, error } = await supabase
+          .from('videos')
+          .select('*')
+          .order('created_at', { ascending: false })
 
         if (error) {
           console.error('Lỗi lấy dữ liệu Supabase:', error.message)
@@ -157,10 +151,10 @@ export default function App() {
         if (data && data.length > 0) {
           const formattedList = data.map((v: Record<string, any>, idx: number) => ({
             id: v.id,
-            title: v.title || 'Video không tên',
+            title: v.title || 'Video sản phẩm Affiliate',
             script: v.script || '',
             status: v.status || 'completed',
-            videoUrl: v.video_url || 'https://example.com/sample.mp4',
+            videoUrl: v.video_url || 'https://example.com/sample-video.mp4',
             createdAt: v.created_at || new Date().toISOString(),
             date: new Date(v.created_at || Date.now()).toLocaleDateString('vi-VN'),
             credits: 5,
@@ -176,7 +170,7 @@ export default function App() {
     }
 
     fetchSupabaseVideos()
-  }, [user])
+  }, [])
 
   // 3. Lưu Video mới vào Kho video (Library) & Supabase
   const handleSaveNewVideo = async (title: string, script: string, videoUrl?: string, image?: string) => {
