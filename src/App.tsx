@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 // Sửa lại các đường dẫn Import cho đúng vị trí file thực tế:
-import CreateVideo from './CreateVideo'
+import CreateVideo from './components/CreateVideo'
 import Library from './pages/Library'
 import Referral from './pages/Referral'
 import Analytics from './pages/Analytics'
@@ -12,7 +12,7 @@ export type AppTab = 'create' | 'library' | 'referral' | 'analytics' | 'settings
 export interface VideoRecord {
   id: string
   title: string
-  script: string
+  script: string  
   status: string
   videoUrl: string
   createdAt: string
