@@ -316,7 +316,24 @@ export default function App() {
           />
         )}
       </main>
-{/* Render Kho video */}
+{/* Tab 1: Tạo video */}
+        {tab === 'create' && (
+          <CreateVideo
+            credits={credits}
+            voices={voices}
+            onVideoCreated={handleSaveNewVideo}
+            onSpendCredits={(amount) => {
+              setCredits((prev) => {
+                const current = isNaN(Number(prev)) ? 50 : Number(prev)
+                const deduct = Number(amount) || 0
+                return Math.max(0, current - deduct)
+              })
+            }}
+            onToast={showToast}
+          />
+        )}
+
+        {/* Tab 2: Kho video */}
         {tab === 'library' && (
           <Library
             videos={videos}
@@ -325,7 +342,7 @@ export default function App() {
           />
         )}
 
-        {/* Render Giới thiệu / Referral */}
+        {/* Tab 3: Giới thiệu */}
         {tab === 'referral' && (
           <Referral
             referral={referral}
@@ -334,12 +351,12 @@ export default function App() {
           />
         )}
 
-        {/* Render Thống kê */}
+        {/* Tab 4: Thống kê */}
         {tab === 'analytics' && (
           <Analytics />
         )}
 
-        {/* Render Cài đặt / Giọng nói */}
+        {/* Tab 5: Cài đặt */}
         {tab === 'settings' && (
           <VoiceSettings
             voices={voices}
