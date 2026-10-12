@@ -171,51 +171,47 @@ export default function App() {
   }, [user])
 
   // 3. Lưu Video mới lên Supabase
+  // 3. Lưu Video mới vào Kho video (Library) & Supabase
   const handleSaveNewVideo = async (title: string, script: string, videoUrl?: string, image?: string) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const currentUserId = session?.user?.id || (user as { id?: string })?.id
-
-    if (!currentUserId) {
-      showToast('Vui lòng đăng nhập để lưu video!')
-      return
-    }
-
-    const payload = {
-      user_id: currentUserId,
-      title: title || 'Video mới',
+    const chosenImage = image || FALLBACK_PRODUCT_IMAGES[Math.floor(Math.random() * FALLBACK_PRODUCT_IMAGES.length)]
+    
+    // Tạo record video mới chuẩn bị đưa vào State để hiện ngay lập tức ở Library
+    const newVideoRecord: VideoRecord = {
+      id: `vid_${Date.now()}`,
+      title: title || 'Video sản phẩm mới',
       script: script || '',
       status: 'completed',
-      video_url: videoUrl || 'https://example.com/sample.mp4',
-    }
+      videoUrl: videoUrl || 'https://example.com/sample-video.mp4',
+      createdAt: new Date().toISOString(),
+      date: new Date().toLocaleDateString('vi-VN'),
+      credits: 5,
+      price: '0đ',
+      image: chosenImage,
+      voice: voices[0] || 'Nam miền Bắc trầm ấm',
+    } as unknown as VideoRecord
 
-    const { data, error } = await supabase
-      .from('videos')
-      .insert([payload])
-      .select()
+    // 1. Cập nhật ngay vào State giao diện Kho video
+    setVideos((prev) => [newVideoRecord, ...prev])
+    showToast('Đã tạo và lưu video vào Kho video thành công!')
 
-    if (error) {
-      console.error('Lỗi INSERT dữ liệu Supabase:', error.message)
-      showToast(`Lỗi lưu video: ${error.message}`)
-    } else if (data && data[0]) {
-      const created = data[0]
-      const chosenImage = image || FALLBACK_PRODUCT_IMAGES[Math.floor(Math.random() * FALLBACK_PRODUCT_IMAGES.length)]
-      
-      const newVideoRecord = {
-        id: created.id,
-        title: created.title,
-        script: created.script,
-        status: created.status,
-        videoUrl: created.video_url,
-        createdAt: created.created_at,
-        date: new Date(created.created_at || Date.now()).toLocaleDateString('vi-VN'),
-        credits: 10,
-        price: '0đ',
-        image: chosenImage,
-        voice: voices[0] || 'Default',
-      } as unknown as VideoRecord
+    // 2. Đồng bộ ngầm lên Supabase (nếu đã đăng nhập)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const currentUserId = session?.user?.id || (user as { id?: string })?.id
 
-      setVideos((prev) => [newVideoRecord, ...prev])
-      showToast('Tạo và lưu video thành công!')
+      if (currentUserId) {
+        await supabase.from('videos').insert([
+          {
+            user_id: currentUserId,
+            title: newVideoRecord.title,
+            script: newVideoRecord.script,
+            status: 'completed',
+            video_url: newVideoRecord.videoUrl,
+          },
+        ])
+      }
+    } catch (err) {
+      console.error('Lỗi đồng bộ Supabase:', err)
     }
   }
 
