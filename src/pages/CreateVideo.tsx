@@ -36,7 +36,7 @@ export default function CreateVideo({ voices, onVideoCreated, onSpendCredits, on
   function analyzeProduct() {
     if (onSpendCredits) {
       const res = onSpendCredits(5, 'phân tích sản phẩm')
-      if (res === false) return
+      if (res === false) return // <-- CHẶN NGAY LẬP TỨC NẾU HẾT ĐIỂM
     }
 
     setPhase('analyzing')
@@ -77,7 +77,7 @@ export default function CreateVideo({ voices, onVideoCreated, onSpendCredits, on
   function handleGenerateVoiceAndVideo() {
     if (onSpendCredits) {
       const res = onSpendCredits(5, 'tạo giọng đọc & xuất video')
-      if (res === false) return
+      if (res === false) return // <-- CHẶN NGAY LẬP TỨC NẾU HẾT ĐIỂM
     }
 
     setPhase('rendering')
