@@ -219,83 +219,63 @@ export default function App() {
     showToast(`Đã xóa giọng đọc: ${voiceToRemove}`)
   }
 
-  return (
-    <div className="app-container">
-      {/* Page Heading */}
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">
-            AFFIVIDEOS AI <span className="eyebrow-dot"></span>
+ return (
+    <div className="app-layout" style={{ display: 'flex', minHeight: '100vh' }}>
+      {/* 1. Thanh Menu bên trái */}
+      <Sidebar activeTab={tab} onTabChange={setTab} credits={credits} />
+
+      {/* 2. Nội dung chính bên phải */}
+      <div style={{ flex: 1, padding: '24px', backgroundColor: '#f8fafc' }}>
+        <Header user={user} credits={credits} />
+
+        <div className="page-heading" style={{ marginBottom: '24px' }}>
+          <p className="eyebrow" style={{ fontSize: '12px', color: '#10b981', fontWeight: 'bold' }}>
+            AFFIVIDEOS AI •
           </p>
-          <h1>{TAB_TITLES[tab]}</h1>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold' }}>{TAB_TITLES[tab]}</h1>
+          <span style={{ fontSize: '14px', color: '#64748b' }}>Không gian sáng tạo của bạn</span>
         </div>
-        <span className="heading-date">Không gian sáng tạo của bạn</span>
+
+        <main className="main-content">
+          {tab === 'create' && (
+            <CreateVideo
+              credits={credits}
+              voices={voices}
+              onVideoCreated={handleSaveNewVideo}
+              onSpendCredits={handleSpendCredits}
+              onToast={showToast}
+            />
+          )}
+
+          {tab === 'library' && (
+            <Library
+              videos={videos}
+              onDelete={handleDeleteVideo}
+              onToast={showToast}
+            />
+          )}
+
+          {tab === 'referral' && (
+            <Referral
+              referral={referral}
+              user={user}
+              onToast={showToast}
+            />
+          )}
+
+          {tab === 'analytics' && <Analytics />}
+
+          {tab === 'settings' && (
+            <VoiceSettings
+              credits={credits}
+              voices={voices}
+              onAddVoice={handleAddVoice}
+              onRemoveVoice={handleRemoveVoice}
+              onToast={showToast}
+            />
+          )}
+        </main>
       </div>
-
-      <main className="main-content">
-        {/* Tab 1: Tạo video */}
-        {tab === 'create' && (
-          <CreateVideo
-            credits={credits}
-            voices={voices || []}
-            onVideoCreated={handleSaveNewVideo}
-            onSpendCredits={(amount) => {
-              let hasEnough = true
-              setCredits((prev) => {
-                const current = isNaN(Number(prev)) ? 50 : Number(prev)
-                const deduct = Number(amount) || 0
-                if (current < deduct) {
-                  hasEnough = false
-                  return current
-                }
-                return current - deduct
-              })
-              if (!hasEnough) {
-                showToast('Bạn đã hết credits! Vui lòng nạp thêm để tiếp tục.')
-                return false
-              }
-              return true
-            }}
-            onToast={showToast}
-          />
-        )}
-
-        {/* Tab 2: Kho video */}
-        {tab === 'library' && (
-          <Library
-            videos={videos && videos.length > 0 ? videos : DEFAULT_MOCK_VIDEOS}
-            onDelete={handleDeleteVideo}
-            onToast={showToast}
-          />
-        )}
-
-        {/* Tab 3: Giới thiệu */}
-        {tab === 'referral' && (
-          <Referral
-            referral={referral || { code: 'AFFI123', successfulReferrals: 0 }}
-            user={user || { name: 'Creator', email: 'user@affivideo.ai' }}
-            onToast={showToast}
-          />
-        )}
-
-        {/* Tab 4: Thống kê */}
-        {tab === 'analytics' && (
-          <Analytics />
-        )}
-
-        {/* Tab 5: Cài đặt */}
-        {tab === 'settings' && (
-          <VoiceSettings
-            credits={credits}
-            transactions={[]}
-            voices={voices || []}
-            onOpenPricing={() => {}}
-            onAddVoice={handleAddVoice}
-            onRemoveVoice={handleRemoveVoice}
-            onToast={showToast}
-          />
-        )}
-      </main>
     </div>
   )
 }
