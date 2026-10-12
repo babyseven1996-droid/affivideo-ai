@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
-// Sửa lại các đường dẫn Import cho đúng vị trí file thực tế:
-import CreateVideo from './components/CreateVideo'
+// Kiểm tra chính xác đường dẫn các component & pages:
+import CreateVideo from './components/CreateVideo' // Hoặc './components/CreateVideo' tùy vào vị trí file CreateVideo.tsx
 import Library from './pages/Library'
 import Referral from './pages/Referral'
 import Analytics from './pages/Analytics'
-import VoiceSettings from './VoiceSettings' // <-- Sửa từ './pages/VoiceSettings' thành './VoiceSettings'
-
+import VoiceSettings from './pages/VoiceSettings'
 export type AppTab = 'create' | 'library' | 'referral' | 'analytics' | 'settings'
 
 export interface VideoRecord {
