@@ -316,7 +316,7 @@ export default function App() {
           />
         )}
       </main>
-{/* Tab 1: Tạo video */}
+      {/* Tab 1: Tạo video */}
         {tab === 'create' && (
           <CreateVideo
             credits={credits}

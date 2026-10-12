@@ -8,9 +8,9 @@ type ReferralProps = {
   onToast: (message: string) => void
 }
 
-export default function Referral({ referral, user, onToast }: ReferralProps) {
-  const [copied, setCopied] = useState(false)
-  const referralLink = `${window.location.origin}/?ref=${encodeURIComponent(referral.code)}`
+export default function Referral({ referral = { code: 'AFFI123', successfulReferrals: 0 }, user, onToast }: ReferralProps) {
+  const safeReferral = referral || { code: 'AFFI123', successfulReferrals: 0 }
+  const referralLink = `${window.location.origin}/?ref=${encodeURIComponent(safeReferral.code)}`
 
   async function copyReferralLink() {
     try {

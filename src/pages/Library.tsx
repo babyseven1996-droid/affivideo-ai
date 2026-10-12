@@ -101,7 +101,7 @@ function downloadMockVideo(video: VideoRecord, onToast: (message: string) => voi
   }
 }
 
-export default function Library({ videos, onDelete, onToast }: LibraryProps) {
+export default function Library({ videos = [], onDelete, onToast }: LibraryProps)  {
   const [selectedVideo, setSelectedVideo] = useState<VideoRecord | null>(null)
   const [pendingDelete, setPendingDelete] = useState<VideoRecord | null>(null)
   const [isPlaying, setIsPlaying] = useState(true)

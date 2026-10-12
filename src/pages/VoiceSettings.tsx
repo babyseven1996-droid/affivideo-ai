@@ -11,15 +11,13 @@ type VoiceSettingsProps = {
   onRemoveVoice: (voice: string) => void
 }
 
-export default function VoiceSettings({ credits, transactions, voices, onOpenPricing, onAddVoice, onRemoveVoice }: VoiceSettingsProps) {
-  const [apiUrl, setApiUrl] = useState('https://api.affivideo.ai/v1')
-  const [apiKey, setApiKey] = useState('')
-  const [voiceName, setVoiceName] = useState('')
-  const [notice, setNotice] = useState('')
-
+export default function VoiceSettings({ credits = 0, transactions = [], voices = [], onOpenPricing, onAddVoice, onRemoveVoice }: VoiceSettingsProps) {
+  const safeVoices = Array.isArray(voices) ? voices : []
+  
+  // Trong hàm addVoice, đổi voices.includes thành safeVoices.includes:
   function addVoice() {
     const cleanName = voiceName.trim()
-    if (!cleanName || voices.includes(cleanName)) return
+    if (!cleanName || safeVoices.includes(cleanName)) return
     onAddVoice(cleanName)
     setVoiceName('')
     setNotice(`Đã thêm giọng đọc "${cleanName}".`)
