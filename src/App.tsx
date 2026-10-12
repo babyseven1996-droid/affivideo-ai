@@ -133,37 +133,45 @@ export default function App() {
   }, [])
 
   // 2. Fetch danh sách Videos từ Supabase
+  // 2. Fetch danh sách Videos từ Supabase
   useEffect(() => {
     async function fetchSupabaseVideos() {
-      const { data: { session } } = await supabase.auth.getSession()
-      const currentUserId = session?.user?.id || (user as { id?: string })?.id
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const currentUserId = session?.user?.id || (user as { id?: string })?.id
 
-      if (!currentUserId) return
+        let query = supabase.from('videos').select('*').order('created_at', { ascending: false })
+        
+        // Nếu có user thì lọc theo user_id, nếu không thì lấy toàn bộ dữ liệu bảng để hiển thị test
+        if (currentUserId) {
+          query = query.eq('user_id', currentUserId)
+        }
 
-      const { data, error } = await supabase
-        .from('videos')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .order('created_at', { ascending: false })
+        const { data, error } = await query
 
-      if (error) {
-        console.error('Lỗi lấy dữ liệu Supabase:', error.message)
-      } else if (data && data.length > 0) {
-        const formattedList = data.map((v: Record<string, any>, idx: number) => ({
-          id: v.id,
-          title: v.title || 'Video không tên',
-          script: v.script || '',
-          status: v.status || 'completed',
-          videoUrl: v.video_url || 'https://example.com/sample.mp4',
-          createdAt: v.created_at || new Date().toISOString(),
-          date: v.created_at ? new Date(v.created_at).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
-          credits: 10,
-          price: '0đ',
-          image: v.image || FALLBACK_PRODUCT_IMAGES[idx % FALLBACK_PRODUCT_IMAGES.length],
-          voice: voices[0] || 'Default',
-        })) as unknown as VideoRecord[]
+        if (error) {
+          console.error('Lỗi lấy dữ liệu Supabase:', error.message)
+          return
+        }
 
-        setVideos(formattedList)
+        if (data && data.length > 0) {
+          const formattedList = data.map((v: Record<string, any>, idx: number) => ({
+            id: v.id,
+            title: v.title || 'Video không tên',
+            script: v.script || '',
+            status: v.status || 'completed',
+            videoUrl: v.video_url || 'https://example.com/sample.mp4',
+            createdAt: v.created_at || new Date().toISOString(),
+            date: new Date(v.created_at || Date.now()).toLocaleDateString('vi-VN'),
+            credits: 5,
+            price: '0đ',
+            image: FALLBACK_PRODUCT_IMAGES[idx % FALLBACK_PRODUCT_IMAGES.length],
+            voice: voices[0] || 'Nam miền Bắc trầm ấm',
+          }))
+          setVideos(formattedList as VideoRecord[])
+        }
+      } catch (err) {
+        console.error('Lỗi fetchSupabaseVideos:', err)
       }
     }
 
@@ -174,8 +182,8 @@ export default function App() {
   const handleSaveNewVideo = async (title: string, script: string, videoUrl?: string, image?: string) => {
     const chosenImage = image || FALLBACK_PRODUCT_IMAGES[Math.floor(Math.random() * FALLBACK_PRODUCT_IMAGES.length)]
     
-    // Tạo record video mới chuẩn xác từ tham số truyền vào
-    const newVideoRecord: VideoRecord = {
+    // 1. Tạo đối tượng hiển thị ngay lập tức trên giao diện
+    const tempVideo: VideoRecord = {
       id: `vid_${Date.now()}`,
       title: title || 'Video sản phẩm mới',
       script: script || '',
@@ -189,25 +197,30 @@ export default function App() {
       voice: voices[0] || 'Nam miền Bắc trầm ấm',
     } as unknown as VideoRecord
 
-    // 1. Đưa ngay vào danh sách videos để hiển thị tức thì trong Kho video
-    setVideos((prev) => [newVideoRecord, ...prev])
+    // Cập nhật State cho Kho video ngay lập tức
+    setVideos((prev) => [tempVideo, ...prev])
     showToast('Đã tạo và lưu video vào Kho video thành công!')
 
-    // 2. Lưu ngầm lên Supabase (nếu tài khoản đã đăng nhập)
+    // 2. Lưu ngầm lên Supabase
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const currentUserId = session?.user?.id || (user as { id?: string })?.id
 
       if (currentUserId) {
-        await supabase.from('videos').insert([
+        const { data, error } = await supabase.from('videos').insert([
           {
             user_id: currentUserId,
-            title: newVideoRecord.title,
-            script: newVideoRecord.script,
+            title: tempVideo.title,
+            script: tempVideo.script,
             status: 'completed',
-            video_url: newVideoRecord.videoUrl,
+            video_url: tempVideo.videoUrl,
           },
-        ])
+        ]).select()
+
+        // Nếu Supabase trả về ID thật, cập nhật lại để đồng bộ
+        if (data && data[0]) {
+          fetchVideos()
+        }
       }
     } catch (err) {
       console.error('Lỗi đồng bộ Supabase:', err)
