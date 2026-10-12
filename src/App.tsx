@@ -290,43 +290,25 @@ export default function App() {
             voices={voices}
             onVideoCreated={handleSaveNewVideo}
             onSpendCredits={(amount) => {
+              let hasEnough = true
               setCredits((prev) => {
                 const current = isNaN(Number(prev)) ? 50 : Number(prev)
                 const deduct = Number(amount) || 0
-                return Math.max(0, current - deduct)
+                
+                // Nếu số dư không đủ -> giữ nguyên điểm và bật cờ chặn
+                if (current < deduct) {
+                  hasEnough = false
+                  return current
+                }
+                return current - deduct
               })
+
+              if (!hasEnough) {
+                showToast('Bạn đã hết credits! Vui lòng nạp thêm để tiếp tục.')
+                return false // Trả về false để chặn tuyệt đối không cho chạy tiếp
+              }
+              return true
             }}
-            onToast={showToast}
-          />
-        )}
-        {tab === 'library' && (
-          <Library
-            videos={videos}
-            onDelete={handleDeleteVideo}
-            onToast={showToast}
-          />
-        )}
-        {tab === 'referral' && (
-          <Referral
-            referral={referral}
-            user={user}
-            onToast={showToast}
-          />
-        )}
-        {tab === 'analytics' && (
-          <Analytics
-            videos={videos}
-            transactions={transactions}
-          />
-        )}
-        {tab === 'settings' && (
-          <VoiceSettings
-            credits={credits}
-            transactions={transactions}
-            voices={voices}
-            onOpenPricing={() => setPricingOpen(true)}
-            onAddVoice={(v) => setVoices((curr) => [...curr, v])}
-            onRemoveVoice={(v) => setVoices((curr) => curr.filter((item) => item !== v))}
             onToast={showToast}
           />
         )}
