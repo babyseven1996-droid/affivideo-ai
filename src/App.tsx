@@ -287,6 +287,7 @@ export default function App() {
 
         {tab === 'create' && (
           <CreateVideo
+          credits={credits}
             voices={voices}
             onVideoCreated={handleSaveNewVideo}
             onSpendCredits={(amount) => {
@@ -294,6 +295,7 @@ export default function App() {
               setCredits((prev) => {
                 const current = isNaN(Number(prev)) ? 50 : Number(prev)
                 const deduct = Number(amount) || 0
+                
                 
                 // Nếu số dư không đủ -> giữ nguyên điểm và bật cờ chặn
                 if (current < deduct) {
