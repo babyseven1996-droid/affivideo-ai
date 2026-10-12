@@ -46,7 +46,13 @@ export default function Header({ credits, darkMode, user, onToggleTheme, onOpenP
         <div className="account-container" ref={accountRef}>
           <button className="user-avatar" aria-label="Mở menu tài khoản" aria-haspopup="menu" aria-expanded={accountOpen} onClick={() => setAccountOpen((open) => !open)}>{user.name.trim().charAt(0).toLocaleUpperCase('vi') || 'A'}</button>
           {accountOpen && <div className="account-menu" role="menu">
-            <div className="account-summary"><span className="account-menu-avatar">{user.name.trim().charAt(0).toLocaleUpperCase('vi') || 'A'}</span><div><strong>{user.name}</strong><span>{user.email}</span></div></div>
+            <div className="account-summary">
+  <span 
+    className="account-menu-avatar" 
+    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+  >
+    {(user.name.trim().charAt(0) || 'H').toUpperCase()}
+  </span><div><strong>{user.name}</strong><span>{user.email}</span></div></div>
             <div className="account-menu-divider" />
             <button role="menuitem" onClick={() => { setAccountOpen(false); onGoToSettings() }}><KeyRound size={16} />Cài đặt API key</button>
             <button role="menuitem" onClick={() => { setAccountOpen(false); onGoToSettings() }}><Settings2 size={16} />Cài đặt tài khoản</button>

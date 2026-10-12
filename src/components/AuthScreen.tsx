@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, Sparkles, UserRound } from 'lucide-react'
 import { authenticateAccount, registerAccount, requestPasswordRecovery, resetAccountPassword } from '../lib/credentials'
 import type { UserProfile } from '../types'
+import { supabase } from '../lib/supabase'
 
 type AuthScreenProps = {
   lastUser: UserProfile | null
@@ -38,15 +39,65 @@ export default function AuthScreen({ lastUser, notice, onAuthenticate }: AuthScr
     }
     setError('')
     setSubmitting(true)
-    const result = mode === 'register'
-      ? await registerAccount(name, email, password)
-      : await authenticateAccount(email, password)
-    setSubmitting(false)
-    if (!result.ok) {
-      setError(result.message)
-      return
+
+    try {
+      if (mode === 'register') {
+        // Đăng ký tài khoản thật với Supabase
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { display_name: name },
+          },
+        })
+
+        if (signUpError) {
+          setError(signUpError.message)
+          setSubmitting(false)
+          return
+        }
+
+        const user = data.user
+        if (user) {
+          onAuthenticate(
+            {
+              id: user.id,
+              email: user.email || email,
+              name: name || email.split('@')[0],
+            },
+            true
+          )
+        }
+      } else {
+        // Đăng nhập tài khoản thật với Supabase
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+
+        if (signInError) {
+          setError('Email hoặc mật khẩu không chính xác.')
+          setSubmitting(false)
+          return
+        }
+
+        const user = data.user
+        if (user) {
+          onAuthenticate(
+            {
+              id: user.id,
+              email: user.email || email,
+              name: user.user_metadata?.display_name || email.split('@')[0],
+            },
+            false
+          )
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Có lỗi xảy ra, vui lòng thử lại.')
+    } finally {
+      setSubmitting(false)
     }
-    onAuthenticate(result.user, result.isNewAccount)
   }
 
   function openRecovery() {

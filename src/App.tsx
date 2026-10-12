@@ -11,8 +11,45 @@ import Sidebar from './components/Sidebar'
 import PricingModal from './components/PricingModal'
 import Toast from './components/Toast'
 import { MOCK_VIDEOS } from './data/mockData'
-import { clearUserSession, readLastUser, readStoredUser, readUserCredits, readUserReferral, readUserTransactions, readUserVideos, readUserVoices, saveUserCredits, saveUserReferral, saveUserSession, saveUserTransactions, saveUserVideos, saveUserVoices } from './lib/appStorage'
 import type { AppTab, CreditTransaction, ReferralProfile, UserProfile, VideoRecord } from './types'
+import { supabase } from './lib/supabase'
+
+// Quản lý lưu trữ phiên đăng nhập
+const STORAGE_USER_KEY = 'affivideo_user'
+
+const readStoredUser = (): UserProfile | null => {
+  try {
+    const raw = localStorage.getItem(STORAGE_USER_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+const saveUserSession = (user: UserProfile) => {
+  try {
+    localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user))
+  } catch (err) {
+    console.error('Lỗi lưu session user:', err)
+  }
+}
+
+const clearUserSession = () => {
+  try {
+    localStorage.removeItem(STORAGE_USER_KEY)
+  } catch (err) {
+    console.error('Lỗi xóa session user:', err)
+  }
+}
+
+// Danh sách ảnh dự phòng cho video affiliate
+const FALLBACK_PRODUCT_IMAGES = [
+  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
+  'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=60',
+  'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=60',
+  'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500&auto=format&fit=crop&q=60',
+  'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=500&auto=format&fit=crop&q=60',
+]
 
 const TAB_TITLES: Record<AppTab, string> = {
   create: 'Tạo video',
@@ -25,151 +62,296 @@ const TAB_TITLES: Record<AppTab, string> = {
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(() => readStoredUser())
   const [tab, setTab] = useState<AppTab>('create')
-  const [credits, setCredits] = useState(() => {
-    const storedUser = readStoredUser()
-    return storedUser ? readUserCredits(storedUser.email) : 50
+
+  // KHỞI TẠO CREDITS AN TOÀN - TRIỆT TIÊU HOÀN TOÀN LỖI NaN
+  const [credits, setCredits] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('affivideo_credits')
+      const parsed = Number(saved)
+      if (isNaN(parsed) || parsed < 0) {
+        localStorage.setItem('affivideo_credits', '50')
+        return 50
+      }
+      return parsed
+    } catch {
+      return 50
+    }
   })
-  const [transactions, setTransactions] = useState<CreditTransaction[]>(() => {
-    const storedUser = readStoredUser()
-    return storedUser ? readUserTransactions(storedUser.email) : []
-  })
-  const [referral, setReferral] = useState<ReferralProfile>(() => {
-    const storedUser = readStoredUser()
-    return storedUser ? readUserReferral(storedUser.email) : { code: '', successfulReferrals: 0, rewardCredits: 0 }
-  })
-  const [videos, setVideos] = useState<VideoRecord[]>(() => {
-    const storedUser = readStoredUser()
-    return storedUser ? readUserVideos(storedUser.email) : MOCK_VIDEOS
-  })
-  const [voices, setVoices] = useState<string[]>(() => {
-    const storedUser = readStoredUser()
-    return storedUser ? readUserVoices(storedUser.email) : ['Nam miền Bắc trầm ấm', 'Nữ miền Nam ngọt ngào']
-  })
+
+  // Tự động đồng bộ credits xuống localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('affivideo_credits', String(credits))
+    } catch {}
+  }, [credits])
+
+  const [transactions] = useState<CreditTransaction[]>([])
+  const [referral] = useState<ReferralProfile>({ code: 'AFFI123', successfulReferrals: 0 })
+  const [videos, setVideos] = useState<VideoRecord[]>(MOCK_VIDEOS)
+  const [voices, setVoices] = useState<string[]>(['Nam miền Bắc trầm ấm', 'Nữ miền Nam ngọt ngào'])
+
   const [darkMode, setDarkMode] = useState(false)
   const [pricingOpen, setPricingOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [authNotice, setAuthNotice] = useState('')
 
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(''), 3000)
+  }
+
+  // 1. Đồng bộ Supabase Auth Session
   useEffect(() => {
-    if (!user) return
-    saveUserSession(user)
-    saveUserCredits(user.email, credits)
-    saveUserReferral(user.email, referral)
-    saveUserTransactions(user.email, transactions)
-    saveUserVideos(user.email, videos)
-    saveUserVoices(user.email, voices)
-  }, [user, credits, referral, transactions, videos, voices])
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const authUser: UserProfile & { id?: string } = {
+          email: session.user.email || '',
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+          id: session.user.id,
+        }
+        setUser(authUser as UserProfile)
+        saveUserSession(authUser as UserProfile)
+      }
+    })
 
-  function recordTransaction(amount: number, description: string) {
-    const transaction: CreditTransaction = {
-      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-      amount,
-      description,
-      createdAt: new Date().toISOString(),
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const authUser: UserProfile & { id?: string } = {
+          email: session.user.email || '',
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+          id: session.user.id,
+        }
+        setUser(authUser as UserProfile)
+        saveUserSession(authUser as UserProfile)
+      } else {
+        setUser(null)
+        clearUserSession()
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // 2. Fetch danh sách Videos từ Supabase
+  useEffect(() => {
+    async function fetchSupabaseVideos() {
+      const { data: { session } } = await supabase.auth.getSession()
+      const currentUserId = session?.user?.id || (user as { id?: string })?.id
+
+      if (!currentUserId) return
+
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Lỗi lấy dữ liệu Supabase:', error.message)
+      } else if (data && data.length > 0) {
+        const formattedList = data.map((v: Record<string, any>, idx: number) => ({
+          id: v.id,
+          title: v.title || 'Video không tên',
+          script: v.script || '',
+          status: v.status || 'completed',
+          videoUrl: v.video_url || 'https://example.com/sample.mp4',
+          createdAt: v.created_at || new Date().toISOString(),
+          date: v.created_at ? new Date(v.created_at).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+          credits: 10,
+          price: '0đ',
+          image: v.image || FALLBACK_PRODUCT_IMAGES[idx % FALLBACK_PRODUCT_IMAGES.length],
+          voice: voices[0] || 'Default',
+        })) as unknown as VideoRecord[]
+
+        setVideos(formattedList)
+      }
     }
-    setTransactions((current) => [transaction, ...current].slice(0, 100))
-  }
 
-  function showToast(message: string) {
-    setToastMessage(message)
-  }
+    fetchSupabaseVideos()
+  }, [user])
 
-  function addVideo(video: VideoRecord) {
-    setVideos((current) => [video, ...current])
-    setTab('library')
-    showToast('Video đã xuất và được thêm vào kho.')
-  }
+  // 3. Lưu Video mới lên Supabase
+  const handleSaveNewVideo = async (title: string, script: string, videoUrl?: string, image?: string) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const currentUserId = session?.user?.id || (user as { id?: string })?.id
 
-  function spendCredits(amount: number, action: string) {
-    if (!user) return false
-    if (credits < amount) {
-      showToast(credits <= 0
-        ? 'Bạn đã hết Credits, vui lòng nạp thêm để tiếp tục!'
-        : `Bạn chưa đủ Credits để ${action}. Hiện còn ${credits}, cần ${amount}. Vui lòng nạp thêm!`)
-      setPricingOpen(true)
-      return false
+    if (!currentUserId) {
+      showToast('Vui lòng đăng nhập để lưu video!')
+      return
     }
-    const nextBalance = credits - amount
-    setCredits(nextBalance)
-    recordTransaction(-amount, action)
-    saveUserCredits(user.email, nextBalance)
-    showToast(`-${amount} Credits đã được trừ cho ${action}. Số dư: ${nextBalance} Credits.`)
-    return true
+
+    const payload = {
+      user_id: currentUserId,
+      title: title || 'Video mới',
+      script: script || '',
+      status: 'completed',
+      video_url: videoUrl || 'https://example.com/sample.mp4',
+    }
+
+    const { data, error } = await supabase
+      .from('videos')
+      .insert([payload])
+      .select()
+
+    if (error) {
+      console.error('Lỗi INSERT dữ liệu Supabase:', error.message)
+      showToast(`Lỗi lưu video: ${error.message}`)
+    } else if (data && data[0]) {
+      const created = data[0]
+      const chosenImage = image || FALLBACK_PRODUCT_IMAGES[Math.floor(Math.random() * FALLBACK_PRODUCT_IMAGES.length)]
+      
+      const newVideoRecord = {
+        id: created.id,
+        title: created.title,
+        script: created.script,
+        status: created.status,
+        videoUrl: created.video_url,
+        createdAt: created.created_at,
+        date: new Date(created.created_at || Date.now()).toLocaleDateString('vi-VN'),
+        credits: 10,
+        price: '0đ',
+        image: chosenImage,
+        voice: voices[0] || 'Default',
+      } as unknown as VideoRecord
+
+      setVideos((prev) => [newVideoRecord, ...prev])
+      showToast('Tạo và lưu video thành công!')
+    }
   }
 
-  function authenticate(nextUser: UserProfile, isNewAccount: boolean) {
-    saveUserSession(nextUser)
-    setUser(nextUser)
-    const initialCredits = isNewAccount ? 20 : readUserCredits(nextUser.email)
-    setCredits(initialCredits)
-    if (isNewAccount) saveUserCredits(nextUser.email, initialCredits)
-    setReferral(readUserReferral(nextUser.email))
-    setTransactions(readUserTransactions(nextUser.email))
-    setVideos(readUserVideos(nextUser.email))
-    setVoices(readUserVoices(nextUser.email))
-    setAuthNotice('')
+  // 4. Xóa Video khỏi Supabase
+  const handleDeleteVideo = async (id: string) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const currentUserId = session?.user?.id || (user as { id?: string })?.id
+
+    if (currentUserId) {
+      const { error } = await supabase
+        .from('videos')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', currentUserId)
+
+      if (error) {
+        console.error('Lỗi khi DELETE video:', error.message)
+        showToast('Không thể xóa video trên database')
+        return
+      }
+    }
+
+    setVideos((prev) => prev.filter((v) => v.id !== id))
+    showToast('Đã xóa video thành công!')
   }
 
-  function logout() {
+  // 5. Đăng xuất
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
     clearUserSession()
     setUser(null)
-    setAuthNotice('Bạn đã đăng xuất thành công.')
-  }
-
-  function deleteVideo(id: string) {
-    setVideos((current) => current.filter((video) => video.id !== id))
-    showToast('Video đã được xóa khỏi kho.')
-  }
-
-  function purchaseCredits(amount: number, plan: string) {
-    setCredits((current) => current + amount)
-    recordTransaction(amount, `Nạp credits · ${plan}`)
-    setPricingOpen(false)
-    showToast(`Thanh toán thành công! Đã cộng ${amount.toLocaleString('vi-VN')} credits từ gói ${plan}.`)
+    setAuthNotice('Đã đăng xuất thành công!')
   }
 
   if (!user) {
-    return <AuthScreen lastUser={readLastUser()} notice={authNotice} onAuthenticate={authenticate} />
+    return (
+      <AuthScreen
+        onLogin={(u) => {
+          setUser(u)
+          saveUserSession(u)
+        }}
+        notice={authNotice}
+      />
+    )
   }
 
   return (
-    <div className={`app-shell${darkMode ? ' theme-dark' : ''}`}>
+    <div className={`app-container ${darkMode ? 'dark' : ''}`}>
       <Header
+        user={user}
         credits={credits}
         darkMode={darkMode}
-        onToggleTheme={() => setDarkMode((value) => !value)}
+        onToggleDarkMode={() => setDarkMode(!darkMode)}
         onOpenPricing={() => setPricingOpen(true)}
-        onGoToSettings={() => setTab('settings')}
-        user={user}
-        onLogout={logout}
+        onLogout={handleLogout}
       />
       <Sidebar active={tab} onChange={setTab} />
+
       <main className="workspace" key={tab}>
         <div className="page-heading">
           <div>
-            <p className="eyebrow">AFFIVIDEO AI <span className="eyebrow-dot" /></p>
+            <p className="eyebrow">
+              AFFIVIDEOS AI <span className="eyebrow-dot"></span>
+            </p>
             <h1>{TAB_TITLES[tab]}</h1>
           </div>
           <span className="heading-date">Không gian sáng tạo của bạn</span>
         </div>
-        {tab === 'create' && <CreateVideo voices={voices} onVideoCreated={addVideo} onSpendCredits={spendCredits} onToast={showToast} />}
-        {tab === 'library' && <Library videos={videos} onDelete={deleteVideo} onToast={showToast} />}
-        {tab === 'referral' && <Referral referral={referral} user={user} onToast={showToast} />}
-        {tab === 'analytics' && <Analytics videos={videos} transactions={transactions} />}
+
+        {tab === 'create' && (
+          <CreateVideo
+            voices={voices}
+            onVideoCreated={handleSaveNewVideo}
+            onSpendCredits={(amount) => {
+              setCredits((prev) => {
+                const current = isNaN(Number(prev)) ? 50 : Number(prev)
+                const deduct = Number(amount) || 0
+                return Math.max(0, current - deduct)
+              })
+            }}
+            onToast={showToast}
+          />
+        )}
+        {tab === 'library' && (
+          <Library
+            videos={videos}
+            onDelete={handleDeleteVideo}
+            onToast={showToast}
+          />
+        )}
+        {tab === 'referral' && (
+          <Referral
+            referral={referral}
+            user={user}
+            onToast={showToast}
+          />
+        )}
+        {tab === 'analytics' && (
+          <Analytics
+            videos={videos}
+            transactions={transactions}
+          />
+        )}
         {tab === 'settings' && (
           <VoiceSettings
             credits={credits}
             transactions={transactions}
             voices={voices}
             onOpenPricing={() => setPricingOpen(true)}
-            onAddVoice={(voice) => setVoices((current) => [...current, voice])}
-            onRemoveVoice={(voice) => setVoices((current) => current.filter((item) => item !== voice))}
+            onAddVoice={(v) => setVoices((curr) => [...curr, v])}
+            onRemoveVoice={(v) => setVoices((curr) => curr.filter((item) => item !== v))}
+            onToast={showToast}
           />
         )}
       </main>
+
       <BottomNav active={tab} onChange={setTab} />
-      {pricingOpen && <PricingModal onClose={() => setPricingOpen(false)} onConfirmPayment={purchaseCredits} />}
-      {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage('')} />}
+
+      {pricingOpen && (
+        <PricingModal
+          onClose={() => setPricingOpen(false)}
+          onConfirmPayment={(pkg: any) => {
+            setCredits((prev) => {
+              const current = isNaN(Number(prev)) ? 50 : Number(prev)
+              const add = Number(pkg?.credits) || Number(pkg?.amount) || 0
+              return current + add
+            })
+            setPricingOpen(false)
+            showToast(`Nạp thành công ${pkg?.credits || pkg?.amount || 0} credits!`)
+          }}
+        />
+      )}
+
+      {toastMessage && (
+        <Toast message={toastMessage} onDismiss={() => setToastMessage('')} />
+      )}
     </div>
   )
 }
