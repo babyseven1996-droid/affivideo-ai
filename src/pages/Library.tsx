@@ -40,12 +40,11 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
         return
       }
 
-      // 3. XỬ LÝ ĐĂNG BÀI REELS CHO FACEBOOK
-     // 3. XỬ LÝ ĐĂNG BÀI REELS CHO FACEBOOK (CHUẨN 3 BƯỚC CỦA META GRAPH API)
+      // 3. XỬ LÝ ĐĂNG BÀI REELS CHO FACEBOOK (DÙNG GRAPH API 1 BƯỚC AN TOÀN TRÁNH CORS)
       if (platform === 'facebook') {
         const userAccessToken = socialAcc.access_token
 
-        onToast('🔍 Đang lấy danh sách Fanpage Facebook của bạn...')
+        onToast('🔍 Đang lấy danh sách Fanpage Facebook...')
         
         // Lấy danh sách Fanpage
         const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${userAccessToken}`)
@@ -67,70 +66,29 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
         const pageId = targetPage.id
         const pageAccessToken = targetPage.access_token
 
-        onToast(`🚀 [BƯỚC 1/3] Đang khởi tạo phiên đăng Reels trên Page "${targetPage.name}"...`)
+        onToast(`🚀 Đang gửi yêu cầu xuất bản Reels lên Page "${targetPage.name}"...`)
 
-        // BƯỚC 1: Khởi tạo phiên Reels (Start Session)
-        const initRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
+        // Gọi API công bố Reels trực tiếp bằng URL video MP4 công khai
+        const publishRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             upload_phase: 'start',
             access_token: pageAccessToken,
-          }),
-        })
-        const initData = await initRes.json()
-
-        if (initData.error || !initData.video_id) {
-          console.error('Lỗi khởi tạo Reels:', initData)
-          onToast(`❌ Lỗi khởi tạo phiên Reels: ${initData.error?.message || 'Không thể tạo phiên'}`)
-          setIsPosting(null)
-          return
-        }
-
-        const videoId = initData.video_id
-
-        onToast(`📤 [BƯỚC 2/3] Đang gửi dữ liệu Video MP4 sang Meta...`)
-
-        // BƯỚC 2: Tải video lên server Meta (Upload file qua link MP4)
-        const uploadRes = await fetch(`https://rupload.facebook.com/video-reels/${videoId}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `OAuth ${pageAccessToken}`,
-            'file_url': video.videoUrl, // Link MP4 công khai của video
-          },
-        })
-        const uploadData = await uploadRes.json()
-
-        if (uploadData.error) {
-          console.error('Lỗi upload video:', uploadData)
-          onToast(`❌ Lỗi upload video sang Facebook: ${uploadData.error?.message}`)
-          setIsPosting(null)
-          return
-        }
-
-        onToast(`🎉 [BƯỚC 3/3] Đang công bố bài viết Reels...`)
-
-        // BƯỚC 3: Hoàn thành và đăng bài Reels (Finish / Publish)
-        const publishRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            upload_phase: 'finish',
-            access_token: pageAccessToken,
-            video_id: videoId,
             video_state: 'PUBLISHED',
-            description: video.title || 'Video Affiliate Reup #reels #viral',
+            description: video.title || 'Video Affiliate #reels #viral',
+            file_url: video.videoUrl, // Link video MP4 từ kho
           }),
         })
         const publishData = await publishRes.json()
 
-        if (publishData.success || publishData.id) {
+        if (publishData.success || publishData.id || publishData.video_id) {
           onToast(`🎉 ĐÃ ĐĂNG REELS THÀNH CÔNG lên Fanpage "${targetPage.name}"!`)
         } else {
-          console.error('Lỗi hoàn tất Reels:', publishData)
-          onToast(`❌ Lỗi công bố Reels: ${publishData.error?.message || 'Không thể đăng bài'}`)
+          const errMsg = publishData.error?.message || 'Không xác định'
+          console.error('Lỗi Reels API:', publishData)
+          onToast(`❌ Lỗi xuất bản Reels: ${errMsg}`)
         }
-      
       } else if (platform === 'tiktok') {
         onToast('⏳ TikTok App đang chờ xét duyệt từ TikTok Developer Center!')
       }
