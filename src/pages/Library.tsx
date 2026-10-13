@@ -9,16 +9,15 @@ interface LibraryProps {
 }
 
 export default function Library({ videos, onDelete, onToast }: LibraryProps) {
-  const [selectedVideo, setSelectedVideo] = useState<VideoRecord | null>(null)
   const [isPosting, setIsPosting] = useState<string | null>(null)
 
-  // Xử lý Đăng Tự Động Facebook Reels & TikTok
+  // Xử lý Đăng Tự Động Facebook & TikTok
   const handleAutoPublish = async (video: VideoRecord, platform: 'tiktok' | 'facebook') => {
     setIsPosting(video.id)
     onToast(`🔍 Đang kiểm tra liên kết tài khoản ${platform.toUpperCase()}...`)
 
     try {
-      // 1. Lấy thông tin user hiện tại trực tiếp từ Supabase Auth
+      // 1. Lấy thông tin user hiện tại từ Supabase Auth
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       if (userError || !user) {
         onToast('⚠️ Phiên đăng nhập hết hạn, vui lòng đăng nhập lại!')
@@ -40,10 +39,13 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
         return
       }
 
+      // 3. XỬ LÝ ĐĂNG VIDEO CHO FACEBOOK FANPAGE
       if (platform === 'facebook') {
         const userAccessToken = socialAcc.access_token
 
         onToast('🔍 Đang lấy danh sách Fanpage Facebook...')
+        
+        // Gọi Meta Graph API lấy danh sách Trang (Pages)
         const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${userAccessToken}`)
         const pagesData = await pagesRes.json()
 
@@ -59,50 +61,29 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
           return
         }
 
+        // Chọn Fanpage đầu tiên quản lý
         const targetPage = pagesData.data[0]
-        onToast(`🚀 Đang khởi tạo phiên Reels trên Fanpage "${targetPage.name}"...`)
+        const pageId = targetPage.id
+        const pageAccessToken = targetPage.access_token
 
-        // 1. Khởi tạo phiên Reels
-        const initRes = await fetch(`https://graph.facebook.com/v18.0/${targetPage.id}/video_reels`, {
+        onToast(`🚀 Đang xuất bản video lên Fanpage "${targetPage.name}"...`)
+
+        // Sử dụng endpoint chuẩn /videos của Facebook Page Graph API (hỗ trợ file_url mượt mà từ client)
+        const publishRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/videos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            upload_phase: 'start',
-            access_token: targetPage.access_token,
-          }),
-        })
-        const initData = await initRes.json()
-
-        if (initData.error || !initData.video_id) {
-          console.error('Lỗi khởi tạo Reels:', initData)
-          onToast(`❌ Lỗi khởi tạo: ${initData.error?.message || 'Không thể tạo phiên'}`)
-          setIsPosting(null)
-          return
-        }
-
-        const videoId = initData.video_id
-        onToast(`📤 Đang hoàn tất tiến trình đăng Reels (ID: ${videoId})...`)
-
-        // 2. Yêu cầu hoàn tất đăng bài
-        const publishRes = await fetch(`https://graph.facebook.com/v18.0/${targetPage.id}/video_reels`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            upload_phase: 'finish',
-            access_token: targetPage.access_token,
-            video_id: videoId,
-            video_state: 'PUBLISHED',
-            description: video.title || 'Video Reels tự động #viral #reels',
-            file_url: video.videoUrl,
+            access_token: pageAccessToken,
+            description: video.title || 'Video Affiliate Reup #viral #reels',
+            file_url: video.videoUrl, // Link video MP4 công khai
           }),
         })
         const publishData = await publishRes.json()
 
-        // In chi tiết lỗi dạng JSON ra Console để đọc dễ dàng
-        console.error('Facebook Publish Error Detail:', JSON.stringify(publishData, null, 2))
+        console.log('Facebook Publish Response:', publishData)
 
-        if (publishData.success || publishData.id) {
-          onToast(`🎉 ĐÃ ĐĂNG REELS THÀNH CÔNG LÊN FANPAGE "${targetPage.name}"!`)
+        if (publishData.id) {
+          onToast(`🎉 ĐÃ ĐĂNG VIDEO THÀNH CÔNG LÊN FANPAGE "${targetPage.name}"!`)
         } else {
           const errMsg = publishData.error?.message || 'Lỗi không xác định từ Facebook'
           onToast(`❌ Facebook từ chối: ${errMsg}`)
@@ -146,7 +127,7 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
               {/* Thông tin Video */}
               <div style={{ padding: '14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
-                  <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 6px 0', lineClamp: 2, WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 6px 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                     {video.title}
                   </h3>
                   <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 12px 0' }}>
