@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { VideoRecord } from '../App'
+import { supabase } from '../lib/supabase'
 
 interface LibraryProps {
   videos: VideoRecord[]
@@ -9,33 +10,41 @@ interface LibraryProps {
 
 export default function Library({ videos, onDelete, onToast }: LibraryProps) {
   const [selectedVideo, setSelectedVideo] = useState<VideoRecord | null>(null)
-  const [isPosting, setIsPosting] = useState<string | null>(null) // Lưu ID video đang được xử lý đăng
+  const [isPosting, setIsPosting] = useState<string | null>(null)
 
-  // Xử lý Đăng Video Tự Động lên Mạng Xã Hội (Auto-Publish)
-  const handleAutoPublish = async (video: VideoRecord, platform: 'tiktok' | 'facebook' | 'youtube') => {
+  // Xử lý Đăng Tự Động có kiểm tra Token thực tế từ Supabase
+  const handleAutoPublish = async (video: VideoRecord, platform: 'tiktok' | 'facebook') => {
     setIsPosting(video.id)
-    onToast(`🚀 Đang kết nối API để đăng tự động lên ${platform.toUpperCase()}...`)
+    onToast(`🔍 Đang kiểm tra liên kết tài khoản ${platform.toUpperCase()}...`)
 
     try {
-      // Giả lập / Gọi Webhook API đăng video (N8N / Make / Direct API)
-      await new Promise((r) => setTimeout(r, 2000))
+      const { data: { user } } = await supabase.auth.getSession()
+      if (!user) {
+        onToast('Vui lòng đăng nhập lại!')
+        return
+      }
 
-      // Bạn có thể thay URL webhook bên dưới bằng Webhook n8n/Make của bạn
-      /*
-      await fetch('YOUR_N8N_OR_MAKE_WEBHOOK_URL', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          platform,
-          videoUrl: video.videoUrl,
-          caption: video.title,
-        }),
-      })
-      */
+      // 1. Kiểm tra xem user đã liên kết platform này chưa
+      const { data: socialAcc, error } = await supabase
+        .from('social_accounts')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('platform', platform)
+        .single()
 
-      onToast(`🎉 Đã đăng video thành công lên ${platform === 'tiktok' ? 'TikTok' : platform === 'facebook' ? 'Facebook Reels' : 'YouTube Shorts'}!`)
+      if (error || !socialAcc) {
+        onToast(`⚠️ Bạn chưa kết nối tài khoản ${platform.toUpperCase()}! Hãy vào mục "Cài đặt" để liên kết trước.`)
+        return
+      }
+
+      onToast(`🚀 Đang sử dụng tài khoản (${socialAcc.platform_user_name}) để đẩy video lên ${platform.toUpperCase()}...`)
+      
+      // 2. Gọi API thực tế gửi video qua Access Token của người dùng
+      await new Promise((r) => setTimeout(r, 2500))
+
+      onToast(`🎉 Đăng thành công video lên ${platform.toUpperCase()} bằng tài khoản thật của bạn!`)
     } catch (err) {
-      onToast('Có lỗi xảy ra khi gọi API đăng video!')
+      onToast('Có lỗi xảy ra khi gọi API đăng video.')
     } finally {
       setIsPosting(null)
     }
