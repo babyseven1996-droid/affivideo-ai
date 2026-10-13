@@ -12,11 +12,11 @@ interface VoiceSettingsProps {
   onToast: (msg: string) => void
 }
 
-// ⚙️ CẤU HÌNH KHÓA API TẬP TRUNG CỦA NỀN TẢNG (CHỈ DÙNG CHO CHỦ APP)
+// ⚙️ CẤU HÌNH KHÓA API TẬP TRUNG CỦA NỀN TẢNG
 const PLATFORM_CONFIG = {
   FACEBOOK_APP_ID: '1456158176610583',
   TIKTOK_CLIENT_KEY: 'awnvpl6f41iwlhc2',
-  TIKTOK_IS_IN_REVIEW: true, // Đặt là true khi TikTok đang trong quá trình xét duyệt
+  TIKTOK_IS_IN_REVIEW: true,
 }
 
 export default function VoiceSettings({
@@ -35,15 +35,16 @@ export default function VoiceSettings({
   })
   const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null)
 
-  // 1. Kiểm tra trạng thái liên kết tài khoản từ Supabase khi người dùng mở trang
+  // 1. Kiểm tra trạng thái liên kết tài khoản từ Supabase
   useEffect(() => {
     async function checkSocialConnections() {
-      if (!user?.id) return
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (!currentUser?.id) return
 
       const { data, error } = await supabase
         .from('social_accounts')
         .select('platform')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
 
       if (!error && data) {
         const connected = { tiktok: false, facebook: false }
@@ -57,24 +58,31 @@ export default function VoiceSettings({
     checkSocialConnections()
   }, [user])
 
-  // 2. Xử lý nhận Token / Code khi mạng xã hội chuyển hướng người dùng quay trở lại trang Web
+  // 2. Xử lý nhận Token từ Facebook OAuth khi chuyển hướng quay lại (Đảm bảo lấy đúng user từ Supabase Auth)
   useEffect(() => {
     async function handleOAuthCallback() {
-      if (!user?.id) return
-
       const REDIRECT_CLEAN_URL = window.location.origin + window.location.pathname
 
-      // --- XỬ LÝ KẾT NỐI FACEBOOK (Trả về Token qua URL Hash #access_token=...) ---
+      // --- XỬ LÝ FACEBOOK CALLBACK ---
       const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
       const fbAccessToken = hashParams.get('access_token')
 
       if (fbAccessToken) {
-        onToast('🔄 Đang kết nối Fanpage Facebook...')
+        onToast('🔄 Đang xác thực và lưu kết nối Fanpage Facebook...')
+        
+        // Lấy trực tiếp user từ Supabase Auth để tránh lỗi mất phiên sau khi redirect
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError || !authUser?.id) {
+          onToast('⚠️ Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại!')
+          return
+        }
+
         try {
           const { error } = await supabase.from('social_accounts').upsert(
             [
               {
-                user_id: user.id,
+                user_id: authUser.id,
                 platform: 'facebook',
                 access_token: fbAccessToken,
                 platform_user_name: 'Facebook Fanpage Connected',
@@ -89,24 +97,28 @@ export default function VoiceSettings({
           onToast('🎉 Kết nối Fanpage Facebook thành công!')
           window.history.replaceState({}, document.title, REDIRECT_CLEAN_URL)
         } catch (err) {
-          onToast('❌ Lỗi khi lưu thông tin Facebook!')
+          onToast('❌ Lỗi khi lưu thông tin kết nối vào cơ sở dữ liệu!')
         }
         return
       }
 
-      // --- XỬ LÝ KẾT NỐI TIKTOK (Trả về Code qua Query Parameter ?code=...) ---
+      // --- XỬ LÝ TIKTOK CALLBACK ---
       const urlParams = new URLSearchParams(window.location.search)
       const tiktokCode = urlParams.get('code')
-      const isTikTokCallback = urlParams.get('platform') === 'tiktok' || tiktokCode
 
-      if (tiktokCode && isTikTokCallback) {
-        onToast('🔄 Đang xác thực tài khoản TikTok Creator...')
+      if (tiktokCode) {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (!authUser?.id) {
+          onToast('⚠️ Vui lòng đăng nhập lại!')
+          return
+        }
+
+        onToast('🔄 Đang xác thực tài khoản TikTok...')
         try {
-          // Lưu thông tin xác thực TikTok vào Supabase
           const { error } = await supabase.from('social_accounts').upsert(
             [
               {
-                user_id: user.id,
+                user_id: authUser.id,
                 platform: 'tiktok',
                 access_token: `tiktok_token_${tiktokCode}`,
                 platform_user_name: 'TikTok Creator Connected',
@@ -127,11 +139,12 @@ export default function VoiceSettings({
     }
 
     handleOAuthCallback()
-  }, [user])
+  }, [])
 
-  // 3. Hàm chuyển hướng khách hàng sang trang cấp quyền của Facebook / TikTok
+  // 3. Hàm chuyển hướng sang trang cấp quyền
   const handleConnectPlatform = async (platform: 'tiktok' | 'facebook') => {
-    if (!user?.id) {
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (!authUser?.id) {
       onToast('Vui lòng đăng nhập lại!')
       return
     }
@@ -146,7 +159,6 @@ export default function VoiceSettings({
         return
       }
 
-      // Chuyển hướng khách hàng tới trang cấp quyền của Facebook
       const fbAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${PLATFORM_CONFIG.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(
         REDIRECT_URI
       )}&response_type=token&scope=pages_manage_posts,pages_show_list,pages_read_engagement`
@@ -155,7 +167,7 @@ export default function VoiceSettings({
 
     } else if (platform === 'tiktok') {
       if (PLATFORM_CONFIG.TIKTOK_IS_IN_REVIEW) {
-        onToast('⏳ TikTok App đang được đội ngũ TikTok xét duyệt, vui lòng thử lại sau!')
+        onToast('⏳ TikTok App đang được duyệt, vui lòng thử lại sau!')
         return
       }
 
@@ -168,15 +180,16 @@ export default function VoiceSettings({
     }
   }
 
-  // 4. Ngắt kết nối tài khoản mạng xã hội
+  // 4. Ngắt kết nối
   const handleDisconnectPlatform = async (platform: 'tiktok' | 'facebook') => {
-    if (!user?.id) return
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (!authUser?.id) return
 
     try {
       const { error } = await supabase
         .from('social_accounts')
         .delete()
-        .eq('user_id', user.id)
+        .eq('user_id', authUser.id)
         .eq('platform', platform)
 
       if (error) throw error
@@ -188,7 +201,6 @@ export default function VoiceSettings({
     }
   }
 
-  // 5. Thêm giọng đọc AI tùy chỉnh
   const handleAddCustomVoice = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newVoiceName.trim()) return
@@ -307,7 +319,7 @@ export default function VoiceSettings({
         <form onSubmit={handleAddCustomVoice} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
           <input
             type="text"
-            placeholder="Nhập tên giọng đọc mới (Ví dụ: Nam miền Nam ấm áp)..."
+            placeholder="Nhập tên giọng đọc mới..."
             value={newVoiceName}
             onChange={(e) => setNewVoiceName(e.target.value)}
             style={{ flex: 1, padding: '12px 16px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px' }}
