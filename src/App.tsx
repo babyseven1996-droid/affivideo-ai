@@ -28,12 +28,6 @@ export interface UserProfile {
   name?: string
 }
 
-const [selectedPackage, setSelectedPackage] = useState<{
-    name: string
-    credits: number
-    price: number
-    priceText: string
-  } | null>(null)
 const FALLBACK_PRODUCT_IMAGES = [
   'https://images.unsplash.com/photo-1556911220-e15b29be8c8f',
   'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9',
@@ -65,6 +59,12 @@ const DEFAULT_MOCK_VIDEOS: VideoRecord[] = [
 ]
 
 export default function App() {
+  const [selectedPackage, setSelectedPackage] = useState<{
+    name: string
+    credits: number
+    price: number
+    priceText: string
+  } | null>(null)
   const [user, setUser] = useState<UserProfile | null>(null)
   const [tab, setTab] = useState<AppTab>('create')
   const [videos, setVideos] = useState<VideoRecord[]>(DEFAULT_MOCK_VIDEOS)
