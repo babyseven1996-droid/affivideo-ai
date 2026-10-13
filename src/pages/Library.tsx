@@ -12,180 +12,193 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
   const [selectedVideo, setSelectedVideo] = useState<VideoRecord | null>(null)
   const [isPosting, setIsPosting] = useState<string | null>(null)
 
-  // Xử lý Đăng Tự Động có kiểm tra Token thực tế từ Supabase
+  // Xử lý Đăng Tự Động Facebook Reels & TikTok
   const handleAutoPublish = async (video: VideoRecord, platform: 'tiktok' | 'facebook') => {
     setIsPosting(video.id)
     onToast(`🔍 Đang kiểm tra liên kết tài khoản ${platform.toUpperCase()}...`)
 
     try {
-      const { data: { user } } = await supabase.auth.getSession()
-      if (!user) {
-        onToast('Vui lòng đăng nhập lại!')
+      // 1. Lấy thông tin user hiện tại trực tiếp từ Supabase Auth
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        onToast('⚠️ Phiên đăng nhập hết hạn, vui lòng đăng nhập lại!')
+        setIsPosting(null)
         return
       }
 
-      // 1. Kiểm tra xem user đã liên kết platform này chưa
-      const { data: socialAcc, error } = await supabase
+      // 2. Kiểm tra xem user đã kết nối tài khoản mạng xã hội này chưa
+      const { data: socialAcc, error: dbError } = await supabase
         .from('social_accounts')
         .select('*')
         .eq('user_id', user.id)
         .eq('platform', platform)
         .single()
 
-      if (error || !socialAcc) {
-        onToast(`⚠️ Bạn chưa kết nối tài khoản ${platform.toUpperCase()}! Hãy vào mục "Cài đặt" để liên kết trước.`)
+      if (dbError || !socialAcc) {
+        onToast(`⚠️ Bạn chưa kết nối tài khoản ${platform.toUpperCase()}! Hãy vào mục "Cài đặt" để liên kết.`)
+        setIsPosting(null)
         return
       }
 
-      onToast(`🚀 Đang sử dụng tài khoản (${socialAcc.platform_user_name}) để đẩy video lên ${platform.toUpperCase()}...`)
-      
-      // 2. Gọi API thực tế gửi video qua Access Token của người dùng
-      await new Promise((r) => setTimeout(r, 2500))
+      // 3. XỬ LÝ ĐĂNG BÀI REELS CHO FACEBOOK
+      if (platform === 'facebook') {
+        const userAccessToken = socialAcc.access_token
 
-      onToast(`🎉 Đăng thành công video lên ${platform.toUpperCase()} bằng tài khoản thật của bạn!`)
-    } catch (err) {
-      onToast('Có lỗi xảy ra khi gọi API đăng video.')
+        onToast('🔍 Đang lấy danh sách Fanpage Facebook của bạn...')
+        
+        // Gọi Meta Graph API lấy danh sách Trang (Pages)
+        const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${userAccessToken}`)
+        const pagesData = await pagesRes.json()
+
+        if (pagesData.error) {
+          onToast(`❌ Lỗi Facebook: ${pagesData.error.message}`)
+          setIsPosting(null)
+          return
+        }
+
+        if (!pagesData.data || pagesData.data.length === 0) {
+          onToast('⚠️ Tài khoản Facebook của bạn chưa quản lý Fanpage nào!')
+          setIsPosting(null)
+          return
+        }
+
+        // Lấy Fanpage đầu tiên của tài khoản
+        const targetPage = pagesData.data[0]
+        const pageId = targetPage.id
+        const pageAccessToken = targetPage.access_token
+
+        onToast(`🚀 Đang xuất bản Reels lên Fanpage "${targetPage.name}"...`)
+
+        // Bước A: Khởi tạo phiên Upload Reels
+        const initRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            upload_phase: 'start',
+            access_token: pageAccessToken,
+          }),
+        })
+        const initData = await initRes.json()
+
+        if (initData.error) {
+          onToast(`❌ Lỗi khởi tạo Reels: ${initData.error.message}`)
+          setIsPosting(null)
+          return
+        }
+
+        // Bước B: Đăng ký URL video MP4 trực tiếp để Facebook phát hành Reels
+        const publishRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            upload_phase: 'finish',
+            access_token: pageAccessToken,
+            video_id: initData.video_id,
+            video_state: 'PUBLISHED',
+            description: video.title || 'Video Affiliate hot #reels #viral',
+            file_url: video.videoUrl, // Đường dẫn MP4 công khai của video
+          }),
+        })
+        const publishData = await publishRes.json()
+
+        if (publishData.success) {
+          onToast(`🎉 Đã đăng Reels thành công lên Fanpage "${targetPage.name}"!`)
+        } else {
+          onToast(`❌ Lỗi xuất bản Reels: ${publishData.error?.message || 'Không xác định'}`)
+        }
+
+      } else if (platform === 'tiktok') {
+        onToast('⏳ TikTok App đang chờ xét duyệt từ TikTok Developer Center!')
+      }
+
+    } catch (err: any) {
+      onToast(`❌ Lỗi kết nối: ${err.message || 'Không thể thực hiện đăng bài'}`)
     } finally {
       setIsPosting(null)
     }
   }
 
-  if (videos.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📂</div>
-        <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 8px 0' }}>Kho video đang trống</h3>
-        <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>Hãy sang tab "Tạo video" để bóc tách & reup video đầu tiên nhé!</p>
-      </div>
-    )
-  }
-
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-        {videos.map((video) => (
-          <div
-            key={video.id}
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '16px',
-              border: '1px solid #e2e8f0',
-              overflow: 'hidden',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {/* Image Cover */}
-            <div style={{ position: 'relative', height: '160px', backgroundColor: '#0f172a' }}>
-              <img
-                src={video.image}
-                alt={video.title}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-              <button
-                onClick={() => setSelectedVideo(video)}
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  margin: 'auto',
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(5, 150, 105, 0.9)',
-                  color: '#fff',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '18px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                }}
-              >
-                ▶
-              </button>
-            </div>
+    <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#0f172a', marginBottom: '20px' }}>
+        📁 Kho Video Đã Tạo
+      </h1>
 
-            {/* Content Info */}
-            <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div>
-                <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 6px 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {video.title}
-                </h4>
-                <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 12px 0' }}>📅 {video.date}</p>
+      {videos.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+          <p style={{ color: '#64748b', fontSize: '16px' }}>Chưa có video nào trong kho. Hãy sang trang "Tạo video" để bắt đầu sáng tạo!</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' }}>
+          {videos.map((video) => (
+            <div key={video.id} style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              
+              {/* Thẻ Video */}
+              <div style={{ position: 'relative', width: '100%', paddingTop: '133%', backgroundColor: '#000' }}>
+                <video
+                  src={video.videoUrl}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  controls
+                />
               </div>
 
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                
-                {/* Nút Đăng Tự Động */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  <button
-                    onClick={() => handleAutoPublish(video, 'tiktok')}
-                    disabled={isPosting === video.id}
-                    style={{ padding: '8px', backgroundColor: '#000000', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-                  >
-                    {isPosting === video.id ? '⏳...' : '🎵 Đăng TikTok'}
-                  </button>
-
-                  <button
-                    onClick={() => handleAutoPublish(video, 'facebook')}
-                    disabled={isPosting === video.id}
-                    style={{ padding: '8px', backgroundColor: '#1877f2', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-                  >
-                    {isPosting === video.id ? '⏳...' : '📘 Đăng Reels'}
-                  </button>
+              {/* Thông tin Video */}
+              <div style={{ padding: '14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 6px 0', lineClamp: 2, WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {video.title}
+                  </h3>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 12px 0' }}>
+                    📅 {video.createdAt}
+                  </p>
                 </div>
 
-                {/* Nút Tải về & Xóa */}
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <a
-                    href={video.videoUrl}
-                    download
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ flex: 1, textAlign: 'center', padding: '8px', backgroundColor: '#f1f5f9', color: '#334155', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', textDecoration: 'none' }}
-                  >
-                    📥 Tải File MP4
-                  </a>
+                {/* Nút thao tác Đăng bài & Tải về */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  
+                  {/* Nút Đăng Tự Động */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                    <button
+                      onClick={() => handleAutoPublish(video, 'tiktok')}
+                      disabled={isPosting === video.id}
+                      style={{ padding: '8px', backgroundColor: '#000000', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', opacity: isPosting === video.id ? 0.6 : 1 }}
+                    >
+                      {isPosting === video.id ? '⏳ ...' : '🎵 Đăng TikTok'}
+                    </button>
 
-                  <button
-                    onClick={() => onDelete(video.id)}
-                    style={{ padding: '8px 12px', backgroundColor: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-                  >
-                    🗑️
-                  </button>
+                    <button
+                      onClick={() => handleAutoPublish(video, 'facebook')}
+                      disabled={isPosting === video.id}
+                      style={{ padding: '8px', backgroundColor: '#1877f2', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', opacity: isPosting === video.id ? 0.6 : 1 }}
+                    >
+                      {isPosting === video.id ? '⏳ ...' : '📘 Đăng Reels'}
+                    </button>
+                  </div>
+
+                  {/* Nút Tải về & Xóa */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <a
+                      href={video.videoUrl}
+                      download
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ flex: 1, textAlign: 'center', padding: '8px', backgroundColor: '#f1f5f9', color: '#334155', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px' }}
+                    >
+                      📥 Tải File MP4
+                    </a>
+                    <button
+                      onClick={() => onDelete(video.id)}
+                      style={{ padding: '8px 12px', backgroundColor: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+
                 </div>
 
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* MODAL PREVIEW XEM VIDEO */}
-      {selectedVideo && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '20px', padding: '24px', maxWidth: '480px', width: '100%', position: 'relative' }}>
-            <button
-              onClick={() => setSelectedVideo(null)}
-              style={{ position: 'absolute', top: '16px', right: '16px', background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              ✕
-            </button>
-
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a', marginBottom: '12px', paddingRight: '30px' }}>
-              {selectedVideo.title}
-            </h3>
-
-            <video
-              src={selectedVideo.videoUrl}
-              controls
-              autoPlay
-              style={{ width: '100%', borderRadius: '12px', maxHeight: '400px', backgroundColor: '#000' }}
-            />
-          </div>
+          ))}
         </div>
       )}
     </div>
