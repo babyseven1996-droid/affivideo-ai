@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { renderAntiCopyrightVideo } from '../services/creatomate'
 
 interface ReupVideoProps {
   credits: number
@@ -98,16 +99,18 @@ export default function CreateVideo({
     setIsProcessing(true)
 
     try {
-      setProcessStatus('✂️ Đang áp dụng thuật toán lách bản quyền (Lật khung hình, chỉnh tốc độ 1.05x)...')
-      await new Promise(r => setTimeout(r, 1500))
+      setProcessStatus('✂️ Đang áp dụng thuật toán lách bản quyền qua Creatomate...')
+      
+      // 👇 DÁN HOẶC THAY THẾ ĐOẠN NÀY VÀO: Gọi hàm xào nấu video gốc thành video an toàn
+      const processedVideoUrl = await renderAntiCopyrightVideo(previewData.playUrl)
 
       setProcessStatus('🚀 Đang lưu video hoàn chỉnh vào Kho video...')
       await new Promise(r => setTimeout(r, 1000))
 
-      const finalPlayUrl = previewData.playUrl
+      // 👇 Dùng link đã xào nấu (`processedVideoUrl`) thay cho link gốc
+      const finalPlayUrl = processedVideoUrl 
       const finalCover = previewData.cover
       const finalTitle = title || previewData.rawTitle
-
       const description = `Nguồn: ${targetUrl} | Lách bản quyền: Lật hình (${autoFlip ? 'Có' : 'Không'}), Tốc độ 1.05x (${changeSpeed ? 'Có' : 'Không'})`
 
       onVideoCreated(finalTitle, description, finalPlayUrl, finalCover)
