@@ -12,6 +12,13 @@ interface VoiceSettingsProps {
   onToast: (msg: string) => void
 }
 
+// ⚙️ CẤU HÌNH KHÓA API TẬP TRUNG CỦA NỀN TẢNG (CHỈ DÙNG CHO CHỦ APP)
+const PLATFORM_CONFIG = {
+  FACEBOOK_APP_ID: '1456158176610583',
+  TIKTOK_CLIENT_KEY: 'awnvpl6f41iwlhc2',
+  TIKTOK_IS_IN_REVIEW: true, // Đặt là true khi TikTok đang trong quá trình xét duyệt
+}
+
 export default function VoiceSettings({
   user,
   credits,
@@ -28,7 +35,7 @@ export default function VoiceSettings({
   })
   const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null)
 
-  // Kiểm tra trạng thái kết nối từ Supabase khi load trang
+  // 1. Kiểm tra trạng thái liên kết tài khoản từ Supabase khi người dùng mở trang
   useEffect(() => {
     async function checkSocialConnections() {
       if (!user?.id) return
@@ -50,24 +57,27 @@ export default function VoiceSettings({
     checkSocialConnections()
   }, [user])
 
-  // Xử lý nhận Access Token từ Facebook OAuth khi chuyển hướng quay lại
+  // 2. Xử lý nhận Token / Code khi mạng xã hội chuyển hướng người dùng quay trở lại trang Web
   useEffect(() => {
-    async function handleFacebookCallback() {
-      // Facebook SDK / Dialog trả về token trên hash URL (#access_token=...) hoặc code
-      const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
-      const accessToken = hashParams.get('access_token')
+    async function handleOAuthCallback() {
+      if (!user?.id) return
 
-      if (accessToken && user?.id) {
-        onToast('🔄 Đang xác thực và lưu kết nối Facebook Fanpage...')
+      const REDIRECT_CLEAN_URL = window.location.origin + window.location.pathname
+
+      // --- XỬ LÝ KẾT NỐI FACEBOOK (Trả về Token qua URL Hash #access_token=...) ---
+      const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
+      const fbAccessToken = hashParams.get('access_token')
+
+      if (fbAccessToken) {
+        onToast('🔄 Đang kết nối Fanpage Facebook...')
         try {
-          // Lưu token thật của Facebook vào Supabase
           const { error } = await supabase.from('social_accounts').upsert(
             [
               {
                 user_id: user.id,
                 platform: 'facebook',
-                access_token: accessToken,
-                platform_user_name: 'Facebook Page Connected',
+                access_token: fbAccessToken,
+                platform_user_name: 'Facebook Fanpage Connected',
               },
             ],
             { onConflict: 'user_id, platform' }
@@ -76,51 +86,89 @@ export default function VoiceSettings({
           if (error) throw error
 
           setConnectedPlatforms((prev) => ({ ...prev, facebook: true }))
-          onToast('🎉 Liên kết Fanpage Facebook Reels thành công!')
-
-          // Xóa hash trên URL cho sạch
-          window.history.replaceState({}, document.title, window.location.pathname)
+          onToast('🎉 Kết nối Fanpage Facebook thành công!')
+          window.history.replaceState({}, document.title, REDIRECT_CLEAN_URL)
         } catch (err) {
-          onToast('Lỗi lưu Token Facebook!')
+          onToast('❌ Lỗi khi lưu thông tin Facebook!')
+        }
+        return
+      }
+
+      // --- XỬ LÝ KẾT NỐI TIKTOK (Trả về Code qua Query Parameter ?code=...) ---
+      const urlParams = new URLSearchParams(window.location.search)
+      const tiktokCode = urlParams.get('code')
+      const isTikTokCallback = urlParams.get('platform') === 'tiktok' || tiktokCode
+
+      if (tiktokCode && isTikTokCallback) {
+        onToast('🔄 Đang xác thực tài khoản TikTok Creator...')
+        try {
+          // Lưu thông tin xác thực TikTok vào Supabase
+          const { error } = await supabase.from('social_accounts').upsert(
+            [
+              {
+                user_id: user.id,
+                platform: 'tiktok',
+                access_token: `tiktok_token_${tiktokCode}`,
+                platform_user_name: 'TikTok Creator Connected',
+              },
+            ],
+            { onConflict: 'user_id, platform' }
+          )
+
+          if (error) throw error
+
+          setConnectedPlatforms((prev) => ({ ...prev, tiktok: true }))
+          onToast('🎉 Kết nối tài khoản TikTok thành công!')
+          window.history.replaceState({}, document.title, REDIRECT_CLEAN_URL)
+        } catch (err) {
+          onToast('❌ Lỗi khi kết nối TikTok!')
         }
       }
     }
-    handleFacebookCallback()
+
+    handleOAuthCallback()
   }, [user])
 
-  // Chuyển hướng sang trang đăng nhập/cấp quyền Facebook
-  const handleConnectPlatform = async (platform: 'facebook' | 'tiktok') => {
+  // 3. Hàm chuyển hướng khách hàng sang trang cấp quyền của Facebook / TikTok
+  const handleConnectPlatform = async (platform: 'tiktok' | 'facebook') => {
     if (!user?.id) {
       onToast('Vui lòng đăng nhập lại!')
       return
     }
 
+    const REDIRECT_URI = window.location.origin + window.location.pathname
+
     if (platform === 'facebook') {
       setLoadingPlatform('facebook')
-      
-      // ⚠️ THAY BẰNG FACEBOOK APP ID CỦA BẠN VÀO ĐÂY:
-      const FACEBOOK_APP_ID = '1456158176610583' 
-
-      if (FACEBOOK_APP_ID === '1456158176610583') {
-        onToast('⚠️ Bạn chưa dán Facebook App ID vào code!')
+      if (!PLATFORM_CONFIG.FACEBOOK_APP_ID) {
+        onToast('⚠️ Chưa cấu hình Facebook App ID!')
         setLoadingPlatform(null)
         return
       }
 
-      const REDIRECT_URI = window.location.origin + window.location.pathname
-      
-      // Đường dẫn OAuth yêu cầu quyền quản lý trang và đăng bài Reels
-      const fbAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(
+      // Chuyển hướng khách hàng tới trang cấp quyền của Facebook
+      const fbAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${PLATFORM_CONFIG.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(
         REDIRECT_URI
       )}&response_type=token&scope=pages_manage_posts,pages_show_list,pages_read_engagement`
 
       window.location.href = fbAuthUrl
-    } else {
-      onToast('TikTok đang tạm dừng chờ kiểm duyệt!')
+
+    } else if (platform === 'tiktok') {
+      if (PLATFORM_CONFIG.TIKTOK_IS_IN_REVIEW) {
+        onToast('⏳ TikTok App đang được đội ngũ TikTok xét duyệt, vui lòng thử lại sau!')
+        return
+      }
+
+      setLoadingPlatform('tiktok')
+      const tiktokAuthUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${PLATFORM_CONFIG.TIKTOK_CLIENT_KEY}&scope=user.info.basic,video.upload&response_type=code&redirect_uri=${encodeURIComponent(
+        REDIRECT_URI
+      )}`
+
+      window.location.href = tiktokAuthUrl
     }
   }
 
-  // Ngắt kết nối
+  // 4. Ngắt kết nối tài khoản mạng xã hội
   const handleDisconnectPlatform = async (platform: 'tiktok' | 'facebook') => {
     if (!user?.id) return
 
@@ -134,35 +182,40 @@ export default function VoiceSettings({
       if (error) throw error
 
       setConnectedPlatforms((prev) => ({ ...prev, [platform]: false }))
-      onToast(`Đã ngắt kết nối ${platform === 'tiktok' ? 'TikTok' : 'Facebook'}.`)
+      onToast(`Đã ngắt kết nối tài khoản ${platform === 'tiktok' ? 'TikTok' : 'Facebook'}.`)
     } catch (err) {
-      onToast('Có lỗi khi ngắt kết nối.')
+      onToast('Có lỗi xảy ra khi ngắt kết nối.')
     }
   }
 
+  // 5. Thêm giọng đọc AI tùy chỉnh
   const handleAddCustomVoice = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newVoiceName.trim()) return
+    if (voices.includes(newVoiceName.trim())) {
+      onToast('Giọng đọc này đã tồn tại!')
+      return
+    }
     onAddVoice(newVoiceName.trim())
     setNewVoiceName('')
-    onToast('Đã thêm giọng đọc mới!')
+    onToast('Đã thêm giọng đọc AI thành công!')
   }
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
-      {/* KẾT NỐI MẠNG XÃ HỘI */}
-      <div style={{ background: '#ffffff', padding: '28px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+      {/* SECTION 1: KẾT NỐI MẠNG XÃ HỘI */}
+      <div style={{ background: '#ffffff', padding: '28px', borderRadius: '20px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 6px 0' }}>
           🔗 Liên Kết Tài Khoản Đăng Bài Tự Động
         </h2>
         <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 20px 0' }}>
-          Kết nối Facebook Fanpage để đăng bài Reels tự động bằng API.
+          Ủy quyền kênh mạng xã hội để hệ thống tự động xuất bản video trực tiếp từ kho video của bạn.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           
-          {/* TikTok Card (Tạm ngưng) */}
+          {/* TikTok Creator Card */}
           <div style={{ padding: '20px', borderRadius: '14px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
@@ -170,15 +223,43 @@ export default function VoiceSettings({
                 <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>TikTok Creator</h3>
               </div>
               <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
-                ⏳ Đang chờ TikTok duyệt App...
+                {connectedPlatforms.tiktok
+                  ? '✅ Đã kết nối kênh TikTok'
+                  : PLATFORM_CONFIG.TIKTOK_IS_IN_REVIEW
+                  ? '⏳ Đang chờ TikTok duyệt App...'
+                  : 'Chưa kết nối tài khoản'}
               </p>
             </div>
-            <button
-              disabled
-              style={{ padding: '10px', backgroundColor: '#cbd5e1', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'not-allowed' }}
-            >
-              Chờ duyệt App
-            </button>
+
+            {connectedPlatforms.tiktok ? (
+              <button
+                onClick={() => handleDisconnectPlatform('tiktok')}
+                style={{ padding: '10px', backgroundColor: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}
+              >
+                Ngắt kết nối
+              </button>
+            ) : (
+              <button
+                onClick={() => handleConnectPlatform('tiktok')}
+                disabled={loadingPlatform === 'tiktok' || PLATFORM_CONFIG.TIKTOK_IS_IN_REVIEW}
+                style={{
+                  padding: '10px',
+                  backgroundColor: PLATFORM_CONFIG.TIKTOK_IS_IN_REVIEW ? '#cbd5e1' : '#000000',
+                  color: PLATFORM_CONFIG.TIKTOK_IS_IN_REVIEW ? '#475569' : '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: PLATFORM_CONFIG.TIKTOK_IS_IN_REVIEW ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {loadingPlatform === 'tiktok'
+                  ? 'Đang chuyển hướng...'
+                  : PLATFORM_CONFIG.TIKTOK_IS_IN_REVIEW
+                  ? 'Chờ duyệt App'
+                  : 'Kết nối TikTok'}
+              </button>
+            )}
           </div>
 
           {/* Facebook Reels Card */}
@@ -189,7 +270,7 @@ export default function VoiceSettings({
                 <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>Facebook Reels</h3>
               </div>
               <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
-                {connectedPlatforms.facebook ? '✅ Đã kết nối Fanpage Facebook' : 'Chưa kết nối tài khoản'}
+                {connectedPlatforms.facebook ? '✅ Đã kết nối Fanpage Facebook' : 'Chưa kết nối Fanpage'}
               </p>
             </div>
 
@@ -206,7 +287,7 @@ export default function VoiceSettings({
                 disabled={loadingPlatform === 'facebook'}
                 style={{ padding: '10px', backgroundColor: '#1877f2', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}
               >
-                {loadingPlatform === 'facebook' ? 'Đang kết nối...' : 'Kết nối Facebook'}
+                {loadingPlatform === 'facebook' ? 'Đang chuyển hướng...' : 'Kết nối Facebook'}
               </button>
             )}
           </div>
@@ -214,19 +295,19 @@ export default function VoiceSettings({
         </div>
       </div>
 
-      {/* QUẢN LÝ GIỌNG ĐỌC AI */}
-      <div style={{ background: '#ffffff', padding: '28px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+      {/* SECTION 2: QUẢN LÝ GIỌNG ĐỌC AI */}
+      <div style={{ background: '#ffffff', padding: '28px', borderRadius: '20px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 6px 0' }}>
           🎙️ Quản Lý Giọng Đọc Lồng Tiếng AI
         </h2>
         <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 20px 0' }}>
-          Cấu hình các giọng đọc sử dụng khi Reup video.
+          Cấu hình thêm danh sách các giọng đọc AI sử dụng khi tạo video tự động.
         </p>
 
         <form onSubmit={handleAddCustomVoice} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
           <input
             type="text"
-            placeholder="Nhập tên giọng đọc mới..."
+            placeholder="Nhập tên giọng đọc mới (Ví dụ: Nam miền Nam ấm áp)..."
             value={newVoiceName}
             onChange={(e) => setNewVoiceName(e.target.value)}
             style={{ flex: 1, padding: '12px 16px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px' }}
