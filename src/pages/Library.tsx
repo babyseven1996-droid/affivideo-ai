@@ -40,11 +40,11 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
         return
       }
 
-      // 3. XỬ LÝ ĐĂNG BÀI REELS CHO FACEBOOK (DÙNG GRAPH API 1 BƯỚC AN TOÀN TRÁNH CORS)
+      // 3. XỬ LÝ ĐĂNG BÀI REELS CHO FACEBOOK FANPAGE
       if (platform === 'facebook') {
         const userAccessToken = socialAcc.access_token
 
-        onToast('🔍 Đang lấy danh sách Fanpage Facebook...')
+        onToast('🔍 Đang kiểm tra danh sách Fanpage của bạn...')
         
         // Lấy danh sách Fanpage
         const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${userAccessToken}`)
@@ -62,13 +62,14 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
           return
         }
 
+        // Chọn Fanpage đầu tiên
         const targetPage = pagesData.data[0]
         const pageId = targetPage.id
         const pageAccessToken = targetPage.access_token
 
-        onToast(`🚀 Đang gửi yêu cầu xuất bản Reels lên Page "${targetPage.name}"...`)
+        onToast(`🚀 Đang xuất bản Reels lên Fanpage: "${targetPage.name}"...`)
 
-        // Gọi API công bố Reels trực tiếp bằng URL video MP4 công khai
+        // Đăng Reels lên Fanpage
         const publishRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -76,19 +77,22 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
             upload_phase: 'start',
             access_token: pageAccessToken,
             video_state: 'PUBLISHED',
-            description: video.title || 'Video Affiliate #reels #viral',
-            file_url: video.videoUrl, // Link video MP4 từ kho
+            description: video.title || 'Video Affiliate Reup #reels #viral',
+            file_url: video.videoUrl,
           }),
         })
         const publishData = await publishRes.json()
 
-        if (publishData.success || publishData.id || publishData.video_id) {
-          onToast(`🎉 ĐÃ ĐĂNG REELS THÀNH CÔNG lên Fanpage "${targetPage.name}"!`)
+        if (publishData.video_id || publishData.id || publishData.success) {
+          const reelId = publishData.video_id || publishData.id || ''
+          onToast(`🎉 Đã gửi bài Reels lên Fanpage "${targetPage.name}" thành công! (Facebook đang xử lý video)`)
+          console.log(`Reel Published Successfully to Page: ${targetPage.name} (${pageId}), Video ID: ${reelId}`)
         } else {
           const errMsg = publishData.error?.message || 'Không xác định'
           console.error('Lỗi Reels API:', publishData)
           onToast(`❌ Lỗi xuất bản Reels: ${errMsg}`)
         }
+
       } else if (platform === 'tiktok') {
         onToast('⏳ TikTok App đang chờ xét duyệt từ TikTok Developer Center!')
       }
