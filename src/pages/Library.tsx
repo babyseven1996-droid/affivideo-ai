@@ -51,7 +51,7 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
         const pagesData = await pagesRes.json()
 
         if (pagesData.error) {
-          onToast(`❌ Lỗi Facebook: ${pagesData.error.message}`)
+          onToast(`❌ Lỗi Facebook Token: ${pagesData.error.message}`)
           setIsPosting(null)
           return
         }
@@ -62,51 +62,33 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
           return
         }
 
-        // Lấy Fanpage đầu tiên của tài khoản
         const targetPage = pagesData.data[0]
         const pageId = targetPage.id
         const pageAccessToken = targetPage.access_token
 
         onToast(`🚀 Đang xuất bản Reels lên Fanpage "${targetPage.name}"...`)
 
-        // Bước A: Khởi tạo phiên Upload Reels
-        const initRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
+        // Đăng Reels bằng API Đơn giản hóa qua Facebook Graph API
+        const publishRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             upload_phase: 'start',
             access_token: pageAccessToken,
-          }),
-        })
-        const initData = await initRes.json()
-
-        if (initData.error) {
-          onToast(`❌ Lỗi khởi tạo Reels: ${initData.error.message}`)
-          setIsPosting(null)
-          return
-        }
-
-        // Bước B: Đăng ký URL video MP4 trực tiếp để Facebook phát hành Reels
-        const publishRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            upload_phase: 'finish',
-            access_token: pageAccessToken,
-            video_id: initData.video_id,
-            video_state: 'PUBLISHED',
-            description: video.title || 'Video Affiliate hot #reels #viral',
-            file_url: video.videoUrl, // Đường dẫn MP4 công khai của video
+            caption: video.title || 'Video Affiliate #reels #viral',
+            video_url: video.videoUrl, // Link video MP4
           }),
         })
         const publishData = await publishRes.json()
 
-        if (publishData.success) {
+        if (publishData.video_id || publishData.success) {
           onToast(`🎉 Đã đăng Reels thành công lên Fanpage "${targetPage.name}"!`)
         } else {
-          onToast(`❌ Lỗi xuất bản Reels: ${publishData.error?.message || 'Không xác định'}`)
+          const errDetail = publishData.error ? `${publishData.error.message} (Code: ${publishData.error.code})` : 'Không xác định'
+          console.error('Facebook Reels Upload Error:', publishData)
+          onToast(`❌ Lỗi xuất bản Reels: ${errDetail}`)
         }
-
+      
       } else if (platform === 'tiktok') {
         onToast('⏳ TikTok App đang chờ xét duyệt từ TikTok Developer Center!')
       }
