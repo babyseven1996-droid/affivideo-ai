@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
-// Kiểm tra chính xác đường dẫn các component & pages:
-import CreateVideo from './components/CreateVideo' // Hoặc './components/CreateVideo' tùy vào vị trí file CreateVideo.tsx
+import CreateVideo from './CreateVideo'
 import Library from './pages/Library'
 import Referral from './pages/Referral'
 import Analytics from './pages/Analytics'
 import VoiceSettings from './pages/VoiceSettings'
+
 export type AppTab = 'create' | 'library' | 'referral' | 'analytics' | 'settings'
 
 export interface VideoRecord {
   id: string
   title: string
-  script: string  
+  script: string
   status: string
   videoUrl: string
   createdAt: string
@@ -66,7 +66,11 @@ export default function App() {
   const [referral, setReferral] = useState({ code: 'AFFI123', successfulReferrals: 0 })
   const [toastMessage, setToastMessage] = useState<string>('')
 
-  // Khởi tạo Credits an toàn
+  // State điều khiển Modal nạp tiền & User Menu
+  const [showPricingModal, setShowPricingModal] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+
+  // Khởi tạo Credits an toàn từ LocalStorage
   const [credits, setCredits] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('affivideo_credits')
@@ -81,7 +85,7 @@ export default function App() {
     }
   })
 
-  // Lưu Credits xuống LocalStorage
+  // Lưu Credits xuống LocalStorage khi có thay đổi
   useEffect(() => {
     try {
       localStorage.setItem('affivideo_credits', String(credits))
@@ -219,7 +223,7 @@ export default function App() {
     showToast(`Đã xóa giọng đọc: ${voiceToRemove}`)
   }
 
- return (
+  return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: 'sans-serif' }}>
       
       {/* ================= 1. SIDEBAR MENU BÊN TRÁI ================= */}
@@ -291,22 +295,80 @@ export default function App() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         
         {/* Header trên cùng */}
-        <header style={{ height: '64px', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 24px', gap: '16px' }}>
+        <header style={{ height: '64px', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 24px', gap: '16px', position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#10b981' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
             Đang hoạt động
           </div>
 
-          <div style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            ⚡ {credits} Credits
-          </div>
+          {/* Nút Nạp Credits (Nhấp vào để bật Modal nạp) */}
+          <button
+            onClick={() => setShowPricingModal(true)}
+            style={{
+              backgroundColor: '#fef3c7',
+              color: '#92400e',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: '1px solid #fde68a',
+              cursor: 'pointer',
+            }}
+            title="Nhấp để nạp thêm Credits"
+          >
+            ⚡ {credits} Credits <span style={{ fontSize: '11px', backgroundColor: '#f59e0b', color: '#fff', padding: '1px 6px', borderRadius: '10px' }}>Nạp +</span>
+          </button>
 
           <button style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '16px', color: '#64748b' }}>
             🌙
           </button>
 
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#dcfce7', color: '#15803d', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px' }}>
-            {user?.name ? user.name.charAt(0).toUpperCase() : 'B'}
+          {/* Avatar & User Menu */}
+          <div style={{ position: 'relative' }}>
+            <div
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}
+              title="Tài khoản của bạn"
+            >
+              {user?.name ? user.name.charAt(0).toUpperCase() : 'B'}
+            </div>
+
+            {/* Menu thả xuống khi click vào Avatar */}
+            {showUserMenu && (
+              <div style={{ position: 'absolute', right: 0, top: '44px', width: '220px', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', padding: '12px', zIndex: 1000 }}>
+                <p style={{ fontSize: '13px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user?.name || 'Tài khoản Creator'}
+                </p>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 12px 0', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user?.email || 'user@affivideo.ai'}
+                </p>
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false)
+                      setTab('settings')
+                    }}
+                    style={{ textAlign: 'left', background: 'none', border: 'none', padding: '8px', fontSize: '13px', color: '#334155', cursor: 'pointer', borderRadius: '6px' }}
+                  >
+                    ⚙️ Cài đặt tài khoản
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setShowUserMenu(false)
+                      await supabase.auth.signOut()
+                      setUser(null)
+                      showToast('Đã đăng xuất thành công!')
+                    }}
+                    style={{ textAlign: 'left', background: '#fef2f2', border: 'none', padding: '8px', fontSize: '13px', color: '#dc2626', cursor: 'pointer', borderRadius: '6px', fontWeight: '600' }}
+                  >
+                    🚪 Đăng xuất
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </header>
 
@@ -378,7 +440,7 @@ export default function App() {
               credits={credits}
               transactions={[]}
               voices={voices || ['Nam miền Bắc trầm ấm', 'Nữ miền Nam ngọt ngào']}
-              onOpenPricing={() => {}}
+              onOpenPricing={() => setShowPricingModal(true)}
               onAddVoice={handleAddVoice}
               onRemoveVoice={handleRemoveVoice}
               onToast={showToast}
@@ -387,7 +449,64 @@ export default function App() {
         </main>
       </div>
 
-      {/* Toast Notification (Khung thông báo nổi) */}
+      {/* Modal Nạp Credits (Bật lên khi bấm vào nút Credits trên Header) */}
+      {showPricingModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '32px', maxWidth: '500px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', position: 'relative' }}>
+            
+            <button
+              onClick={() => setShowPricingModal(false)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
+            >
+              ✕
+            </button>
+
+            <h3 style={{ fontSize: '22px', fontWeight: 'bold', color: '#0f172a', marginBottom: '8px', textAlign: 'center' }}>Nạp Thêm Credits Sáng Tạo</h3>
+            <p style={{ fontSize: '14px', color: '#64748b', textAlign: 'center', marginBottom: '24px' }}>Chọn gói credits phù hợp để tiếp tục tạo video tự động hàng loạt.</p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+              <div 
+                onClick={() => {
+                  setCredits(prev => prev + 100)
+                  setShowPricingModal(false)
+                  showToast('Nạp thành công 100 Credits vào tài khoản!')
+                }}
+                style={{ padding: '16px', border: '2px solid #10b981', borderRadius: '12px', cursor: 'pointer', backgroundColor: '#f0fdf4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <div>
+                  <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0 }}>Gói Cơ Bản (100 Credits)</p>
+                  <p style={{ fontSize: '12px', color: '#047857', margin: '2px 0 0 0' }}>Tạo khoảng 20 video ngắn</p>
+                </div>
+                <span style={{ fontWeight: 'bold', color: '#059669', fontSize: '16px' }}>99.000đ</span>
+              </div>
+
+              <div 
+                onClick={() => {
+                  setCredits(prev => prev + 500)
+                  setShowPricingModal(false)
+                  showToast('Nạp thành công 500 Credits vào tài khoản!')
+                }}
+                style={{ padding: '16px', border: '2px solid #3b82f6', borderRadius: '12px', cursor: 'pointer', backgroundColor: '#eff6ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <div>
+                  <p style={{ fontWeight: 'bold', color: '#1e40af', margin: 0 }}>Gói Chuyên Nghiệp (500 Credits) 🔥</p>
+                  <p style={{ fontSize: '12px', color: '#1d4ed8', margin: '2px 0 0 0' }}>Tạo khoảng 100 video ngắn</p>
+                </div>
+                <span style={{ fontWeight: 'bold', color: '#2563eb', fontSize: '16px' }}>399.000đ</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowPricingModal(false)}
+              style={{ width: '100%', padding: '12px', background: '#64748b', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification (Thông báo nổi) */}
       {toastMessage && (
         <div style={{ position: 'fixed', bottom: '24px', right: '24px', backgroundColor: '#0f172a', color: '#ffffff', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', fontSize: '14px', zIndex: 9999 }}>
           {toastMessage}
