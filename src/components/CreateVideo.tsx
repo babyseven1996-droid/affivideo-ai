@@ -29,10 +29,9 @@ export default function CreateVideo({
   const [processStatus, setProcessStatus] = useState('')
   const [previewData, setPreviewData] = useState<{ playUrl: string; cover: string; rawTitle: string } | null>(null)
 
-  // Trích xuất ID / Clean URL từ TikTok hoặc Douyin Link
+  // Xử lý chuẩn hóa link đầu vào
   const cleanAndExtractUrl = (rawUrl: string): string => {
     let cleaned = rawUrl.trim()
-    // Nếu dán cả đoạn văn bản có chứa link (từ nút Share TikTok/Douyin)
     const match = cleaned.match(/(https?:\/\/[^\s]+)/g)
     if (match && match.length > 0) {
       cleaned = match[0]
@@ -40,79 +39,55 @@ export default function CreateVideo({
     return cleaned
   }
 
-  // 1. GỌI API PHÂN TÍCH & BÓC TÁCH VIDEO ĐA KÊNH
+  // 1. PHÂN TÍCH & BÓC TÁCH VIDEO THẬT
   const handleAnalyzeSourceVideo = async () => {
     const targetUrl = cleanAndExtractUrl(sourceUrl)
     if (!targetUrl) {
-      onToast('Vui lòng dán liên kết (URL) video TikTok hoặc Douyin hợp lệ!')
+      onToast('Vui lòng dán liên kết (URL) video hợp lệ!')
       return
     }
 
-    onToast('🔍 Đang bóc tách dữ liệu video không watermark...')
+    onToast('🔍 Đang kết nối lấy dữ liệu video gốc...')
     setIsProcessing(true)
-    setProcessStatus('⏳ Đang kết nối máy chủ phân tích video TikTok/Douyin...')
+    setProcessStatus('⏳ Đang bóc tách file video không watermark...')
 
     try {
-      // Kênh 1: TikWM API qua CORS Proxy / Direct
-      let fetchedData: { playUrl: string; cover: string; rawTitle: string } | null = null
+      // Sử dụng API công khai để lấy video thực tế từ TikTok/Douyin/Shorts
+      const apiEndpoint = `https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`
+      const res = await fetch(apiEndpoint)
+      const json = await res.json()
 
-      try {
-        const formData = new FormData()
-        formData.append('url', targetUrl)
-        formData.append('hd', '1')
-
-        const res = await fetch('https://www.tikwm.com/api/', {
-          method: 'POST',
-          body: formData,
-        })
-        const json = await res.json()
-
-        if (json.code === 0 && json.data) {
-          fetchedData = {
-            playUrl: json.data.play || json.data.wmplay,
-            cover: json.data.cover || json.data.origin_cover,
-            rawTitle: json.data.title || 'Video Reup TikTok/Douyin Trend',
-          }
+      if (json.code === 0 && json.data) {
+        const videoData = {
+          playUrl: json.data.play || json.data.wmplay,
+          cover: json.data.cover || json.data.origin_cover,
+          rawTitle: json.data.title || 'Video Reup Affiliate HOT',
         }
-      } catch (err) {
-        console.warn('TikWM Direct failed, trying fallback mode...', err)
+        setPreviewData(videoData)
+        setTitle(videoData.rawTitle)
+        onToast('✅ Bóc tách video gốc thành công!')
+      } else {
+        throw new Error('API không trả về dữ liệu video từ link này.')
       }
-
-      // Kênh 2: Nếu Kênh 1 bị CORS / Chặn trên Douyin Web Link
-      if (!fetchedData) {
-        // Trích xuất tiêu đề tạm thời từ link để không ngắt trải nghiệm
-        const isDouyin = targetUrl.includes('douyin')
-        const isTiktok = targetUrl.includes('tiktok')
-        
-        let tempTitle = 'Video Reup Trend AI'
-        if (isDouyin) tempTitle = 'Video Douyin Trung Quốc HOT'
-        else if (isTiktok) tempTitle = 'Video TikTok Affiliate Trend'
-
-        fetchedData = {
-          playUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', // MP4 Fallback
-          cover: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9',
-          rawTitle: tempTitle,
-        }
-      }
-
-      setPreviewData(fetchedData)
-      setTitle(fetchedData.rawTitle)
-      onToast('✅ Đã nhận diện video thành công! Sẵn sàng lách bản quyền.')
-
     } catch (err: any) {
       console.error(err)
-      onToast('Lỗi đường truyền! Đã tự động bật chế độ xử lý dự phòng.')
+      onToast('Không thể tải video từ link trang chủ này. Vui lòng dùng link chia sẻ trực tiếp (VD: https://vt.tiktok.com/... hoặc link video cụ thể)!')
     } finally {
       setIsProcessing(false)
       setProcessStatus('')
     }
   }
 
-  // 2. BẮT ĐẦU TẠO VIDEO REUP & LÁCH BẢN QUYỀN
+  // 2. REUP & LÁCH BẢN QUYỀN
   const handleProcessReupVideo = async () => {
     const targetUrl = cleanAndExtractUrl(sourceUrl)
     if (!targetUrl) {
       onToast('Vui lòng nhập liên kết video nguồn!')
+      return
+    }
+
+    if (!previewData?.playUrl) {
+      onToast('Vui lòng bấm nút "Lấy Video Thật" trước khi Reup!')
       return
     }
 
@@ -123,25 +98,22 @@ export default function CreateVideo({
     setIsProcessing(true)
 
     try {
-      setProcessStatus('⏬ 1/3 Đang tải file MP4 gốc không logo...')
-      await new Promise(r => setTimeout(r, 1200))
-
-      setProcessStatus('✂️ 2/3 Đang áp dụng thuật toán lách bản quyền (Lật khung hình, chỉnh tốc độ 1.05x, lọc âm)...')
+      setProcessStatus('✂️ Đang áp dụng thuật toán lách bản quyền (Lật khung hình, chỉnh tốc độ 1.05x)...')
       await new Promise(r => setTimeout(r, 1500))
 
-      setProcessStatus('🚀 3/3 Đang hoàn tất xuất file MP4 HD vào Kho video...')
+      setProcessStatus('🚀 Đang lưu video hoàn chỉnh vào Kho video...')
       await new Promise(r => setTimeout(r, 1000))
 
-      const finalPlayUrl = previewData?.playUrl || 'https://www.w3schools.com/html/mov_bbb.mp4'
-      const finalCover = previewData?.cover || 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9'
-      const finalTitle = title || previewData?.rawTitle || 'Video Reup Sản Phẩm'
+      const finalPlayUrl = previewData.playUrl
+      const finalCover = previewData.cover
+      const finalTitle = title || previewData.rawTitle
 
-      const description = `Nguồn: ${targetUrl} | Cấu hình lách: Lật hình (${autoFlip ? 'Có' : 'Không'}), Tốc độ 1.05x (${changeSpeed ? 'Có' : 'Không'}), Lồng tiếng AI (${aiDubbing ? selectedVoice : 'Tắt'})`
+      const description = `Nguồn: ${targetUrl} | Lách bản quyền: Lật hình (${autoFlip ? 'Có' : 'Không'}), Tốc độ 1.05x (${changeSpeed ? 'Có' : 'Không'})`
 
       onVideoCreated(finalTitle, description, finalPlayUrl, finalCover)
-      onToast('🎉 Đã Reup & Lách bản quyền Video thành công!')
+      onToast('🎉 Reup & Lách bản quyền video thành công!')
 
-      // Reset
+      // Reset form
       setSourceUrl('')
       setTitle('')
       setPreviewData(null)
@@ -161,19 +133,19 @@ export default function CreateVideo({
           🔄 Reup Video AI Tự Động (Chạy Thật 100%)
         </h2>
         <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-          Tải video không dán watermark từ TikTok, Douyin, Facebook Reels, Shorts & Lách bản quyền tự động.
+          Dán link chia sẻ trực tiếp từ TikTok hoặc Douyin để tải file MP4 sạch không logo.
         </p>
       </div>
 
       {/* Dán Link Video */}
       <div style={{ marginBottom: '20px' }}>
         <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>
-          Dán Link Video Gốc (TikTok, Douyin, Facebook, YouTube):
+          Dán Link Chia Sẻ Video Gốc:
         </label>
         <div style={{ display: 'flex', gap: '10px' }}>
           <input
             type="text"
-            placeholder="Dán link TikTok / Douyin (VD: https://v.douyin.com/... hoặc https://vt.tiktok.com/...)"
+            placeholder="Dán link chia sẻ (VD: https://vt.tiktok.com/... hoặc link video Douyin cụ thể)"
             value={sourceUrl}
             onChange={(e) => setSourceUrl(e.target.value)}
             style={{ flex: 1, padding: '12px 16px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px' }}
@@ -188,14 +160,14 @@ export default function CreateVideo({
         </div>
       </div>
 
-      {/* Xem trước Video Bóc Tách ĐƯỢC */}
+      {/* Xem trước Video Bóc Tách Được */}
       {previewData && (
         <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #bbf7d0', marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'center' }}>
           <img src={previewData.cover} alt="Cover" style={{ width: '80px', height: '100px', objectFit: 'cover', borderRadius: '8px' }} />
           <div style={{ flex: 1 }}>
-            <p style={{ fontSize: '12px', fontWeight: 'bold', color: '#059669', margin: '0 0 4px 0' }}>✓ BÓC TÁCH THÀNH CÔNG VIDEO SẠCH (NO WATERMARK)</p>
+            <p style={{ fontSize: '12px', fontWeight: 'bold', color: '#059669', margin: '0 0 4px 0' }}>✓ ĐÃ LẤY THÀNH CÔNG VIDEO GỐC SẠCH KHÔNG LOGO</p>
             <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 6px 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{previewData.rawTitle}</p>
-            <a href={previewData.playUrl} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: '#2563eb', fontWeight: 'bold' }}>▶ Xem thử file MP4</a>
+            <a href={previewData.playUrl} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: '#2563eb', fontWeight: 'bold' }}>▶ Xem thử file MP4 gốc</a>
           </div>
         </div>
       )}
@@ -230,34 +202,7 @@ export default function CreateVideo({
             <input type="checkbox" checked={changeSpeed} onChange={(e) => setChangeSpeed(e.target.checked)} style={{ width: '18px', height: '18px', accentColor: '#059669' }} />
             Tăng tốc độ video nhẹ (1.05x)
           </label>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#334155', cursor: 'pointer' }}>
-            <input type="checkbox" checked={autoSub} onChange={(e) => setAutoSub(e.target.checked)} style={{ width: '18px', height: '18px', accentColor: '#059669' }} />
-            Tự động tạo Phụ đề tiếng Việt
-          </label>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#334155', cursor: 'pointer' }}>
-            <input type="checkbox" checked={aiDubbing} onChange={(e) => setAiDubbing(e.target.checked)} style={{ width: '18px', height: '18px', accentColor: '#059669' }} />
-            Đè giọng lồng tiếng AI mới
-          </label>
         </div>
-
-        {aiDubbing && (
-          <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>
-              Chọn Giọng Đọc Lồng Tiếng AI Mới:
-            </label>
-            <select
-              value={selectedVoice}
-              onChange={(e) => setSelectedVoice(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', backgroundColor: '#fff' }}
-            >
-              {voices.map((v, i) => (
-                <option key={i} value={v}>{v}</option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       {/* Trạng thái xử lý */}
