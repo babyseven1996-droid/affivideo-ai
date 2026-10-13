@@ -11,7 +11,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string) {
         'Authorization': `Bearer ${import.meta.env.VITE_CREATOMATE_API_KEY}`,
       },
       body: JSON.stringify({
-        template_id: 'TEMPLATE_ID_CỦA_BẠN', // ID Template đã chọn
+        template_id: 'c1ffdb12-a26c-49db-9046-b84f67d89e0e', // ID Template đã chọn
         modifications: {
           // 1. Truyền video gốc vào các layer
           'SourceVideo': videoUrl,
