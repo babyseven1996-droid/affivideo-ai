@@ -675,11 +675,6 @@ export default function App() {
                 </div>
               </div>
             )}
-
-          </div>
-        </div>
-      )}
-
             <button
               onClick={() => setShowPricingModal(false)}
               style={{ width: '100%', padding: '12px', background: '#64748b', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
