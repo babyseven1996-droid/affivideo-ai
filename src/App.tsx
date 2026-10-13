@@ -569,71 +569,116 @@ export default function App() {
       </div>
 
       {/* Modal Nạp Credits (Bao gồm 3 Gói Nạp: Cơ bản, Chuyên nghiệp & VIP) */}
+      {/* Modal Nạp Credits Tích hợp VietQR Thanh Toán */}
       {showPricingModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '32px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', position: 'relative' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '24px', padding: '32px', maxWidth: selectedPackage ? '560px' : '520px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
             
             <button
-              onClick={() => setShowPricingModal(false)}
-              style={{ position: 'absolute', top: '16px', right: '16px', background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
+              onClick={() => {
+                setShowPricingModal(false)
+                setSelectedPackage(null)
+              }}
+              style={{ position: 'absolute', top: '20px', right: '20px', background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px', color: '#64748b' }}
             >
               ✕
             </button>
 
-            <h3 style={{ fontSize: '22px', fontWeight: 'bold', color: '#0f172a', marginBottom: '8px', textAlign: 'center' }}>Nạp Thêm Credits Sáng Tạo</h3>
-            <p style={{ fontSize: '14px', color: '#64748b', textAlign: 'center', marginBottom: '24px' }}>Chọn gói credits phù hợp để tiếp tục tạo video tự động hàng loạt.</p>
+            {!selectedPackage ? (
+              <>
+                <h3 style={{ fontSize: '22px', fontWeight: 'bold', color: '#0f172a', marginBottom: '8px', textAlign: 'center' }}>Nạp Thêm Credits Sáng Tạo</h3>
+                <p style={{ fontSize: '14px', color: '#64748b', textAlign: 'center', marginBottom: '24px' }}>Chọn gói credits phù hợp để tiếp tục tạo video tự động hàng loạt.</p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-              
-              {/* Gói 1 */}
-              <div 
-                onClick={() => {
-                  setCredits(prev => prev + 100)
-                  setShowPricingModal(false)
-                  showToast('Nạp thành công 100 Credits vào tài khoản!')
-                }}
-                style={{ padding: '16px', border: '2px solid #10b981', borderRadius: '12px', cursor: 'pointer', backgroundColor: '#f0fdf4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <div>
-                  <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0 }}>Gói Cơ Bản (100 Credits)</p>
-                  <p style={{ fontSize: '12px', color: '#047857', margin: '2px 0 0 0' }}>Tạo khoảng 20 video ngắn</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
+                  
+                  {/* Gói 1 */}
+                  <div 
+                    onClick={() => setSelectedPackage({ name: 'Gói Cơ Bản', credits: 100, price: 99000, priceText: '99.000đ' })}
+                    style={{ padding: '18px', border: '2px solid #10b981', borderRadius: '16px', cursor: 'pointer', backgroundColor: '#f0fdf4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' }}
+                  >
+                    <div>
+                      <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0, fontSize: '15px' }}>Gói Cơ Bản (100 Credits)</p>
+                      <p style={{ fontSize: '12px', color: '#047857', margin: '3px 0 0 0' }}>Tạo khoảng 20 video ngắn</p>
+                    </div>
+                    <span style={{ fontWeight: 'bold', color: '#059669', fontSize: '17px' }}>99.000đ</span>
+                  </div>
+
+                  {/* Gói 2 */}
+                  <div 
+                    onClick={() => setSelectedPackage({ name: 'Gói Chuyên Nghiệp', credits: 500, price: 399000, priceText: '399.000đ' })}
+                    style={{ padding: '18px', border: '2px solid #3b82f6', borderRadius: '16px', cursor: 'pointer', backgroundColor: '#eff6ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' }}
+                  >
+                    <div>
+                      <p style={{ fontWeight: 'bold', color: '#1e40af', margin: 0, fontSize: '15px' }}>Gói Chuyên Nghiệp (500 Credits) 🔥</p>
+                      <p style={{ fontSize: '12px', color: '#1d4ed8', margin: '3px 0 0 0' }}>Tạo khoảng 100 video ngắn</p>
+                    </div>
+                    <span style={{ fontWeight: 'bold', color: '#2563eb', fontSize: '17px' }}>399.000đ</span>
+                  </div>
+
+                  {/* Gói 3 */}
+                  <div 
+                    onClick={() => setSelectedPackage({ name: 'Gói VIP Doanh Nghiệp', credits: 1000, price: 699000, priceText: '699.000đ' })}
+                    style={{ padding: '18px', border: '2px solid #8b5cf6', borderRadius: '16px', cursor: 'pointer', backgroundColor: '#f5f3ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' }}
+                  >
+                    <div>
+                      <p style={{ fontWeight: 'bold', color: '#5b21b6', margin: 0, fontSize: '15px' }}>Gói VIP Doanh Nghiệp (1.000 Credits) 👑</p>
+                      <p style={{ fontSize: '12px', color: '#6d28d9', margin: '3px 0 0 0' }}>Tạo 200 video + Ưu tiên server AI</p>
+                    </div>
+                    <span style={{ fontWeight: 'bold', color: '#7c3aed', fontSize: '17px' }}>699.000đ</span>
+                  </div>
+
                 </div>
-                <span style={{ fontWeight: 'bold', color: '#059669', fontSize: '16px' }}>99.000đ</span>
-              </div>
+              </>
+            ) : (
+              /* MÀN HÌNH QUÉT MÃ QR THANH TOÁN */
+              <div style={{ textAlign: 'center' }}>
+                <button
+                  onClick={() => setSelectedPackage(null)}
+                  style={{ background: 'none', border: 'none', color: '#059669', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '12px', float: 'left' }}
+                >
+                  ← Chọn lại gói khác
+                </button>
+                <div style={{ clear: 'both' }}></div>
 
-              {/* Gói 2 */}
-              <div 
-                onClick={() => {
-                  setCredits(prev => prev + 500)
-                  setShowPricingModal(false)
-                  showToast('Nạp thành công 500 Credits vào tài khoản!')
-                }}
-                style={{ padding: '16px', border: '2px solid #3b82f6', borderRadius: '12px', cursor: 'pointer', backgroundColor: '#eff6ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <div>
-                  <p style={{ fontWeight: 'bold', color: '#1e40af', margin: 0 }}>Gói Chuyên Nghiệp (500 Credits) 🔥</p>
-                  <p style={{ fontSize: '12px', color: '#1d4ed8', margin: '2px 0 0 0' }}>Tạo khoảng 100 video ngắn</p>
+                <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0f172a', marginBottom: '4px' }}>
+                  Thanh Toán: {selectedPackage.name}
+                </h3>
+                <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '20px' }}>
+                  Quét mã QR dưới đây bằng App Ngân hàng (MBBank, Vietcombank, Momo, VPBank...)
+                </p>
+
+                {/* Khung Hiển thị Mã VietQR */}
+                <div style={{ backgroundColor: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'inline-block', marginBottom: '20px' }}>
+                  <img
+                    src={`https://img.vietqr.io/image/MB-0333333333-compact2.png?amount=${selectedPackage.price}&addInfo=${encodeURIComponent(`NAP ${selectedPackage.credits} CREDITS AFFIVIDEO`)}&accountName=${encodeURIComponent('AFFIVIDEO AI')}`}
+                    alt="Mã QR Thanh Toán"
+                    style={{ width: '240px', height: '240px', objectFit: 'contain', borderRadius: '12px' }}
+                  />
+                  <div style={{ marginTop: '12px', textAlign: 'left', fontSize: '13px', color: '#334155' }}>
+                    <p style={{ margin: '4px 0' }}>Số tiền: <strong style={{ color: '#059669', fontSize: '15px' }}>{selectedPackage.priceText}</strong></p>
+                    <p style={{ margin: '4px 0' }}>Nội dung chuyển khoản: <strong style={{ color: '#2563eb' }}>NAP {selectedPackage.credits} CREDITS</strong></p>
+                  </div>
                 </div>
-                <span style={{ fontWeight: 'bold', color: '#2563eb', fontSize: '16px' }}>399.000đ</span>
-              </div>
 
-              {/* Gói 3 (Gói VIP Mới Thêm) */}
-              <div 
-                onClick={() => {
-                  setCredits(prev => prev + 1000)
-                  setShowPricingModal(false)
-                  showToast('Nạp thành công 1.000 Credits VIP vào tài khoản!')
-                }}
-                style={{ padding: '16px', border: '2px solid #8b5cf6', borderRadius: '12px', cursor: 'pointer', backgroundColor: '#f5f3ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <div>
-                  <p style={{ fontWeight: 'bold', color: '#5b21b6', margin: 0 }}>Gói VIP Doanh Nghiệp (1.000 Credits) 👑</p>
-                  <p style={{ fontSize: '12px', color: '#6d28d9', margin: '2px 0 0 0' }}>Tạo khoảng 200 video ngắn + Ưu tiên AI</p>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    onClick={() => {
+                      setCredits(prev => prev + selectedPackage.credits)
+                      setShowPricingModal(false)
+                      setSelectedPackage(null)
+                      showToast(`Thanh toán thành công! Hệ thống đã cộng ${selectedPackage.credits} Credits vào tài khoản!`)
+                    }}
+                    style={{ flex: 1, padding: '14px', background: '#059669', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer' }}
+                  >
+                    ✓ Tôi đã chuyển khoản xong
+                  </button>
                 </div>
-                <span style={{ fontWeight: 'bold', color: '#7c3aed', fontSize: '16px' }}>699.000đ</span>
               </div>
+            )}
 
-            </div>
+          </div>
+        </div>
+      )}
 
             <button
               onClick={() => setShowPricingModal(false)}
