@@ -28,66 +28,69 @@ export default function VoiceSettings({
   })
   const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null)
 
-  // Kiểm tra trạng thái kết nối mạng xã hội từ Supabase bằng user.id
+  // Xử lý nhận mã Code trả về từ URL sau khi người dùng cấp quyền OAuth
   useEffect(() => {
-    async function checkSocialConnections() {
-      if (!user?.id) return
+    async function handleOAuthCallback() {
+      const urlParams = new URLSearchParams(window.location.search)
+      const code = urlParams.get('code')
 
-      const { data, error } = await supabase
-        .from('social_accounts')
-        .select('platform')
-        .eq('user_id', user.id)
+      if (code && user?.id) {
+        onToast('🔄 Đang xác thực và lấy Access Token từ nền tảng...')
+        try {
+          // Tại đây, bạn sẽ gọi một Supabase Edge Function hoặc Serverless API của bạn
+          // để đổi mã `code` lấy `access_token` từ TikTok/Facebook Server bằng Client Secret.
+          // Sau đó lưu thẳng vào bảng `social_accounts`.
 
-      if (!error && data) {
-        const connected = { tiktok: false, facebook: false }
-        data.forEach((item: any) => {
-          if (item.platform === 'tiktok') connected.tiktok = true
-          if (item.platform === 'facebook') connected.facebook = true
-        })
-        setConnectedPlatforms(connected)
+          // Ví dụ gọi API đổi token (Backend tự xử lý):
+          /*
+          await fetch('/api/exchange-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, userId: user.id })
+          })
+          */
+
+          onToast('🎉 Liên kết tài khoản thành công!')
+          // Xóa param code trên URL sạch sẽ
+          window.history.replaceState({}, document.title, window.location.pathname)
+        } catch (err) {
+          onToast('Lỗi xác thực token!')
+        }
       }
     }
-    checkSocialConnections()
+    handleOAuthCallback()
   }, [user])
 
   // Xử lý Liên kết tài khoản OAuth (TikTok / Facebook)
+  // Xử lý Chuyển hướng sang trang OAuth Thật của TikTok / Facebook
   const handleConnectPlatform = async (platform: 'tiktok' | 'facebook') => {
-    setLoadingPlatform(platform)
-    
     if (!user?.id) {
       onToast('Vui lòng đăng nhập lại!')
-      setLoadingPlatform(null)
       return
     }
 
-    try {
-      await new Promise((r) => setTimeout(r, 1200))
+    // Thay thế các giá trị này bằng Client Key / App ID thực tế của bạn từ TikTok/Meta Developer Dashboard
+    const TIKTOK_CLIENT_KEY = 'YOUR_TIKTOK_CLIENT_KEY'
+    const FACEBOOK_APP_ID = 'YOUR_FACEBOOK_APP_ID'
+    const REDIRECT_URI = encodeURIComponent(window.location.origin) // Hoặc trang callback của bạn
 
-      const mockToken = `access_token_${platform}_${Date.now()}`
-      const mockAccountName = platform === 'tiktok' ? '@creator_tiktok_vn' : 'Page Facebook Reels Pro'
+    if (platform === 'tiktok') {
+      if (TIKTOK_CLIENT_KEY === 'YOUR_TIKTOK_CLIENT_KEY') {
+        onToast('⚠️ Bạn chưa cấu hình TIKTOK_CLIENT_KEY trong code. Hãy điền Client Key từ TikTok Developers!')
+        return
+      }
+      // Điều hướng tới trang đăng nhập cấp quyền chính thức của TikTok
+      const tiktokAuthUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${TIKTOK_CLIENT_KEY}&scope=video.publish,user.info.basic&response_type=code&redirect_uri=${REDIRECT_URI}`
+      window.location.href = tiktokAuthUrl
 
-      // Lưu token vào bảng social_accounts trên Supabase
-      const { error } = await supabase.from('social_accounts').upsert(
-        [
-          {
-            user_id: user.id,
-            platform: platform,
-            access_token: mockToken,
-            platform_user_name: mockAccountName,
-          },
-        ],
-        { onConflict: 'user_id, platform' }
-      )
-
-      if (error) throw error
-
-      setConnectedPlatforms((prev) => ({ ...prev, [platform]: true }))
-      onToast(`🎉 Liên kết thành công tài khoản ${platform === 'tiktok' ? 'TikTok' : 'Facebook'}!`)
-    } catch (err: any) {
-      console.error(err)
-      onToast(err.message || 'Lỗi liên kết tài khoản!')
-    } finally {
-      setLoadingPlatform(null)
+    } else if (platform === 'facebook') {
+      if (FACEBOOK_APP_ID === 'YOUR_FACEBOOK_APP_ID') {
+        onToast('⚠️ Bạn chưa cấu hình FACEBOOK_APP_ID trong code. Hãy điền App ID từ Meta for Developers!')
+        return
+      }
+      // Điều hướng tới trang đăng nhập cấp quyền chính thức của Facebook
+      const fbAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${FACEBOOK_APP_ID}&redirect_uri=${REDIRECT_URI}&scope=pages_manage_posts,pages_show_list`
+      window.location.href = fbAuthUrl
     }
   }
 
