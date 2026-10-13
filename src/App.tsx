@@ -50,20 +50,20 @@ export default function App() {
   const [referral, setReferral] = useState({ code: 'AFFI123', successfulReferrals: 0 })
   const [toastMessage, setToastMessage] = useState<string>('')
 
-  // State điều khiển Modal nạp tiền & User Menu
+  // State Landing Page & Auth Modal
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false)
+  const [isSignUpMode, setIsSignUpMode] = useState<boolean>(false)
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+
+  // State nạp tiền & User Menu
   const [showPricingModal, setShowPricingModal] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [selectedPackage, setSelectedPackage] = useState<{ name: string; credits: number; price: number; priceText: string } | null>(null)
   const [currentTxCode, setCurrentTxCode] = useState<string>('')
   const [isWaitingPayment, setIsWaitingPayment] = useState<boolean>(false)
 
-  // Form Đăng nhập / Đăng ký
-  const [authEmail, setAuthEmail] = useState('')
-  const [authPassword, setAuthPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [authLoading, setAuthLoading] = useState(false)
-
-  // Quản lý Credits độc lập theo User ID
   const [credits, setCredits] = useState<number>(50)
 
   useEffect(() => {
@@ -118,7 +118,6 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Fetch danh sách Videos theo User từ Supabase
   const fetchSupabaseVideos = async () => {
     if (!user) return
     try {
@@ -155,7 +154,7 @@ export default function App() {
     fetchSupabaseVideos()
   }, [user])
 
-  // Lắng nghe Realtime tự động cộng tiền khi Webhook xác nhận giao dịch
+  // Lắng nghe Realtime Webhook VietQR
   useEffect(() => {
     if (!currentTxCode || !user?.id) return
 
@@ -176,7 +175,7 @@ export default function App() {
             setShowPricingModal(false)
             setSelectedPackage(null)
             setIsWaitingPayment(false)
-            showToast(`🎉 TỰ ĐỘNG XÁC NHẬN! Đã cộng ${addedCredits} Credits vào tài khoản của bạn!`)
+            showToast(`🎉 TỰ ĐỘNG XÁC NHẬN! Đã cộng ${addedCredits} Credits!`)
           }
         }
       )
@@ -187,7 +186,6 @@ export default function App() {
     }
   }, [currentTxCode, user, credits])
 
-  // Xử lý Chọn Gói Nạp Credits & Sinh Mã Giao Dịch
   const handleSelectPackage = async (pkg: { name: string; credits: number; price: number; priceText: string }) => {
     setSelectedPackage(pkg)
     if (!user?.id) return
@@ -211,7 +209,6 @@ export default function App() {
     }
   }
 
-  // Xử lý Đăng nhập / Đăng ký
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!authEmail || !authPassword) {
@@ -221,7 +218,7 @@ export default function App() {
     setAuthLoading(true)
 
     try {
-      if (isSignUp) {
+      if (isSignUpMode) {
         const { error } = await supabase.auth.signUp({
           email: authEmail,
           password: authPassword,
@@ -236,6 +233,7 @@ export default function App() {
         if (error) throw error
         showToast('Đăng nhập thành công!')
       }
+      setShowAuthModal(false)
     } catch (err: any) {
       showToast(err.message || 'Lỗi đăng nhập/đăng ký!')
     } finally {
@@ -251,7 +249,6 @@ export default function App() {
     showToast('Đã đăng xuất tài khoản!')
   }
 
-  // Lưu Video Vĩnh Viễn vào Database Supabase
   const handleSaveNewVideo = async (title: string, script: string, videoUrl?: string, image?: string) => {
     const chosenImage = image || FALLBACK_PRODUCT_IMAGES[Math.floor(Math.random() * FALLBACK_PRODUCT_IMAGES.length)]
     const finalVideoUrl = videoUrl || 'https://www.w3schools.com/html/mov_bbb.mp4'
@@ -286,14 +283,10 @@ export default function App() {
           },
         ])
 
-        if (error) {
-          console.error('Lỗi khi lưu video vào Supabase:', error.message)
-        } else {
-          fetchSupabaseVideos()
-        }
+        if (!error) fetchSupabaseVideos()
       }
     } catch (err) {
-      console.error('Lỗi kết nối CSDL:', err)
+      console.error(err)
     }
   }
 
@@ -302,79 +295,168 @@ export default function App() {
     showToast('Đã xóa video.')
   }
 
-  // Giao diện khi chưa Đăng nhập / Đăng ký
+  // ==========================================
+  // GIAO DIỆN 1: LANDING PAGE CHO KHÁCH VÃNG LAI (!user)
+  // ==========================================
   if (!user) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', fontFamily: 'sans-serif', padding: '20px' }}>
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '20px', padding: '40px', maxWidth: '420px', width: '100%', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05)', border: '1px solid #e2e8f0' }}>
-          
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#059669', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '24px', marginBottom: '12px' }}>
+      <div style={{ minHeight: '100vh', backgroundColor: '#ffffff', fontFamily: 'sans-serif', color: '#0f172a' }}>
+        
+        {/* Navigation Bar */}
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 40px', borderBottom: '1px solid #e2e8f0', maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '20px' }}>
               ✦
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
+            <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#0f172a' }}>
               AffiVideo <span style={{ color: '#059669' }}>AI</span>
-            </h1>
-            <p style={{ fontSize: '14px', color: '#64748b', marginTop: '6px' }}>
-              {isSignUp ? 'Tạo tài khoản mới để bắt đầu' : 'Đăng nhập vào không gian sáng tạo'}
-            </p>
+            </span>
           </div>
 
-          <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>Email</label>
-              <input
-                type="email"
-                placeholder="yours@example.com"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                required
-                style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>Mật khẩu</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                required
-                style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
-              />
-            </div>
-
+          <div style={{ display: 'flex', gap: '12px' }}>
             <button
-              type="submit"
-              disabled={authLoading}
-              style={{ width: '100%', padding: '14px', backgroundColor: '#059669', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: 'bold', cursor: authLoading ? 'not-allowed' : 'pointer', marginTop: '8px' }}
+              onClick={() => { setIsSignUpMode(false); setShowAuthModal(true) }}
+              style={{ padding: '10px 20px', backgroundColor: 'transparent', color: '#059669', border: '1px solid #059669', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}
             >
-              {authLoading ? '⏳ Đang xử lý...' : (isSignUp ? 'Tạo Tài Khoản' : 'Đăng Nhập Ngay')}
+              Đăng nhập
             </button>
-          </form>
-
-          <div style={{ textAlign: 'center', marginTop: '20px' }}>
             <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              style={{ background: 'none', border: 'none', color: '#059669', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+              onClick={() => { setIsSignUpMode(true); setShowAuthModal(true) }}
+              style={{ padding: '10px 20px', backgroundColor: '#059669', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}
             >
-              {isSignUp ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký ngay'}
+              Dùng thử miễn phí
             </button>
           </div>
+        </header>
 
-        </div>
+        {/* Hero Section */}
+        <section style={{ textAlign: 'center', padding: '80px 20px 60px', maxWidth: '800px', margin: '0 auto' }}>
+          <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold' }}>
+            🚀 Nền tảng Reup & Tạo Video AI Hàng Đầu Cho Affiliate
+          </span>
+          <h1 style={{ fontSize: '44px', fontWeight: '800', lineHeight: '1.2', margin: '20px 0', color: '#0f172a' }}>
+            Tự động hóa Reup Video & Lách Bản Quyền <span style={{ color: '#059669' }}>Chỉ Với 1 Click</span>
+          </h1>
+          <p style={{ fontSize: '16px', color: '#64748b', lineHeight: '1.6', marginBottom: '32px' }}>
+            Tải video sạch không logo từ TikTok, Douyin, Facebook Reels, Shorts. Tự động lật khung hình, chỉnh tốc độ và xuất bản hàng loạt cho nhà sáng tạo nội dung.
+          </p>
+          <button
+            onClick={() => { setIsSignUpMode(true); setShowAuthModal(true) }}
+            style={{ padding: '16px 36px', backgroundColor: '#059669', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 10px 25px -5px rgba(5, 150, 105, 0.4)' }}
+          >
+            Bắt đầu sáng tạo ngay ➔
+          </button>
+        </section>
+
+        {/* Features Grid */}
+        <section style={{ padding: '60px 20px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+            <h2 style={{ textAlign: 'center', fontSize: '28px', fontWeight: 'bold', marginBottom: '40px' }}>Tính Năng Vượt Trội</h2>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+              
+              <div style={{ backgroundColor: '#fff', padding: '28px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '28px', marginBottom: '12px' }}>📥</div>
+                <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>Bóc Tách Không Watermark</h3>
+                <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.5' }}>Lấy link video gốc sắc nét từ TikTok, Douyin, YouTube Shorts không dính logo chỉ trong 2 giây.</p>
+              </div>
+
+              <div style={{ backgroundColor: '#fff', padding: '28px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '28px', marginBottom: '12px' }}>🛡️</div>
+                <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>Lách Bản Quyền Thông Minh</h3>
+                <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.5' }}>Tự động lật gương (Flip), đổi tốc độ nhẹ giúp vượt qua kiểm duyệt bản quyền tự động.</p>
+              </div>
+
+              <div style={{ backgroundColor: '#fff', padding: '28px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '28px', marginBottom: '12px' }}>⚡</div>
+                <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>Thanh Toán Auto-Bank 24/7</h3>
+                <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.5' }}>Hệ thống quét VietQR tự động cộng credits sau 3 giây khi chuyển khoản thành công.</p>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* Auth Modal */}
+        {showAuthModal && (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '40px', maxWidth: '420px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', position: 'relative' }}>
+              
+              <button
+                onClick={() => setShowAuthModal(false)}
+                style={{ position: 'absolute', top: '16px', right: '16px', background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                ✕
+              </button>
+
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 6px 0' }}>
+                  {isSignUpMode ? 'Tạo Tài Khoản Mới' : 'Đăng Nhập AffiVideo AI'}
+                </h2>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Truy cập hệ thống Reup video tự động hàng loạt</p>
+              </div>
+
+              <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>Email</label>
+                  <input
+                    type="email"
+                    placeholder="yours@example.com"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>Mật khẩu</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  style={{ width: '100%', padding: '14px', backgroundColor: '#059669', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: 'bold', cursor: authLoading ? 'not-allowed' : 'pointer', marginTop: '6px' }}
+                >
+                  {authLoading ? '⏳ Đang xử lý...' : (isSignUpMode ? 'Đăng Ký Ngay' : 'Đăng Nhập')}
+                </button>
+              </form>
+
+              <div style={{ textAlign: 'center', marginTop: '18px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsSignUpMode(!isSignUpMode)}
+                  style={{ background: 'none', border: 'none', color: '#059669', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  {isSignUpMode ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký ngay'}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
 
         {toastMessage && (
           <div style={{ position: 'fixed', bottom: '24px', right: '24px', backgroundColor: '#0f172a', color: '#ffffff', padding: '12px 20px', borderRadius: '10px', fontSize: '14px', zIndex: 9999 }}>
             {toastMessage}
           </div>
         )}
+
       </div>
     )
   }
 
+  // ==========================================
+  // GIAO DIỆN 2: DASHBOARD SAU KHI ĐĂNG NHẬP (user)
+  // ==========================================
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: 'sans-serif' }}>
       
@@ -536,10 +618,9 @@ export default function App() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
                   
-                  {/* Gói 1 */}
                   <div 
                     onClick={() => handleSelectPackage({ name: 'Gói Cơ Bản', credits: 100, price: 99000, priceText: '99.000đ' })}
-                    style={{ padding: '18px', border: '2px solid #10b981', borderRadius: '16px', cursor: 'pointer', backgroundColor: '#f0fdf4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' }}
+                    style={{ padding: '18px', border: '2px solid #10b981', borderRadius: '16px', cursor: 'pointer', backgroundColor: '#f0fdf4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                   >
                     <div>
                       <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0, fontSize: '15px' }}>Gói Cơ Bản (100 Credits)</p>
@@ -548,10 +629,9 @@ export default function App() {
                     <span style={{ fontWeight: 'bold', color: '#059669', fontSize: '17px' }}>99.000đ</span>
                   </div>
 
-                  {/* Gói 2 */}
                   <div 
                     onClick={() => handleSelectPackage({ name: 'Gói Chuyên Nghiệp', credits: 500, price: 399000, priceText: '399.000đ' })}
-                    style={{ padding: '18px', border: '2px solid #3b82f6', borderRadius: '16px', cursor: 'pointer', backgroundColor: '#eff6ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' }}
+                    style={{ padding: '18px', border: '2px solid #3b82f6', borderRadius: '16px', cursor: 'pointer', backgroundColor: '#eff6ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                   >
                     <div>
                       <p style={{ fontWeight: 'bold', color: '#1e40af', margin: 0, fontSize: '15px' }}>Gói Chuyên Nghiệp (500 Credits) 🔥</p>
@@ -560,10 +640,9 @@ export default function App() {
                     <span style={{ fontWeight: 'bold', color: '#2563eb', fontSize: '17px' }}>399.000đ</span>
                   </div>
 
-                  {/* Gói 3 */}
                   <div 
                     onClick={() => handleSelectPackage({ name: 'Gói VIP Doanh Nghiệp', credits: 1000, price: 699000, priceText: '699.000đ' })}
-                    style={{ padding: '18px', border: '2px solid #8b5cf6', borderRadius: '16px', cursor: 'pointer', backgroundColor: '#f5f3ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' }}
+                    style={{ padding: '18px', border: '2px solid #8b5cf6', borderRadius: '16px', cursor: 'pointer', backgroundColor: '#f5f3ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                   >
                     <div>
                       <p style={{ fontWeight: 'bold', color: '#5b21b6', margin: 0, fontSize: '15px' }}>Gói VIP (1.000 Credits) 👑</p>
@@ -575,7 +654,6 @@ export default function App() {
                 </div>
               </>
             ) : (
-              /* MÀN HÌNH QUÉT MÃ VIETQR TỰ ĐỘNG CHECK PAYMENT */
               <div style={{ textAlign: 'center' }}>
                 <button
                   onClick={() => {
@@ -595,7 +673,6 @@ export default function App() {
                   Quét mã QR bằng App Ngân hàng. Hệ thống sẽ tự động cộng Credits sau khi chuyển khoản thành công!
                 </p>
 
-                {/* Khung VietQR Động */}
                 <div style={{ backgroundColor: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'inline-block', marginBottom: '16px' }}>
                   <img
                     src={`https://img.vietqr.io/image/MB-0333333333-compact2.png?amount=${selectedPackage.price}&addInfo=${encodeURIComponent(currentTxCode)}&accountName=${encodeURIComponent('AFFIVIDEO AI')}`}
@@ -608,19 +685,17 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Trạng thái chờ Webhook tự động */}
                 <div style={{ padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0', color: '#166534', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
                   <span>🔄</span> Đang chờ ngân hàng xác nhận giao dịch tự động...
                 </div>
 
-                {/* Nút bấm thủ công dự phòng */}
                 <button
                   onClick={() => {
                     updateCredits(credits + selectedPackage.credits)
                     setShowPricingModal(false)
                     setSelectedPackage(null)
                     setIsWaitingPayment(false)
-                    showToast(`Thanh toán thành công! Đã cộng ${selectedPackage.credits} Credits vào tài khoản!`)
+                    showToast(`Thanh toán thành công! Đã cộng ${selectedPackage.credits} Credits!`)
                   }}
                   style={{ width: '100%', padding: '12px', background: '#059669', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}
                 >
@@ -633,9 +708,8 @@ export default function App() {
         </div>
       )}
 
-      {/* TOAST NOTIFICATION */}
       {toastMessage && (
-        <div style={{ position: 'fixed', bottom: '24px', right: '24px', backgroundColor: '#0f172a', color: '#ffffff', padding: '12px 20px', borderRadius: '10px', fontSize: '14px', zIndex: 9999, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', backgroundColor: '#0f172a', color: '#ffffff', padding: '12px 20px', borderRadius: '10px', fontSize: '14px', zIndex: 9999 }}>
           {toastMessage}
         </div>
       )}
