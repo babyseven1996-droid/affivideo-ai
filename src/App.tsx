@@ -70,6 +70,12 @@ export default function App() {
   const [showPricingModal, setShowPricingModal] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
 
+  // Form Đăng nhập / Đăng ký khi chưa authed
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [authLoading, setAuthLoading] = useState(false)
+
   // Khởi tạo Credits an toàn từ LocalStorage
   const [credits, setCredits] = useState<number>(() => {
     try {
@@ -85,7 +91,7 @@ export default function App() {
     }
   })
 
-  // Lưu Credits xuống LocalStorage khi có thay đổi
+  // Lưu Credits xuống LocalStorage khi thay đổi
   useEffect(() => {
     try {
       localStorage.setItem('affivideo_credits', String(credits))
@@ -109,6 +115,8 @@ export default function App() {
           id: session.user.id,
         }
         setUser(authUser)
+      } else {
+        setUser(null)
       }
     })
 
@@ -130,6 +138,7 @@ export default function App() {
 
   // 2. Fetch danh sách Videos từ Supabase
   const fetchSupabaseVideos = async () => {
+    if (!user) return
     try {
       const { data, error } = await supabase
         .from('videos')
@@ -165,6 +174,46 @@ export default function App() {
   useEffect(() => {
     fetchSupabaseVideos()
   }, [user])
+
+  // Xử lý Đăng nhập / Đăng ký
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!authEmail || !authPassword) {
+      showToast('Vui lòng nhập đầy đủ Email và Mật khẩu!')
+      return
+    }
+    setAuthLoading(true)
+
+    try {
+      if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+        })
+        if (error) throw error
+        showToast('Đăng ký thành công! Vui lòng kiểm tra email để xác thực hoặc đăng nhập.')
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: authPassword,
+        })
+        if (error) throw error
+        showToast('Đăng nhập thành công!')
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi xác thực tài khoản!')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  // Xử lý Đăng xuất
+  const handleSignOut = async () => {
+    setShowUserMenu(false)
+    await supabase.auth.signOut()
+    setUser(null)
+    showToast('Đã đăng xuất thành công!')
+  }
 
   // Lưu Video mới tạo
   const handleSaveNewVideo = async (title: string, script: string, videoUrl?: string, image?: string) => {
@@ -223,6 +272,81 @@ export default function App() {
     showToast(`Đã xóa giọng đọc: ${voiceToRemove}`)
   }
 
+  // ================= 0. GIAO DIỆN ĐĂNG NHẬP (HIỆN KHI CHƯA ĐĂNG NHẬP) =================
+  if (!user) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', fontFamily: 'sans-serif', padding: '20px' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '20px', padding: '40px', maxWidth: '420px', width: '100%', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05)', border: '1px solid #e2e8f0' }}>
+          
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#059669', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '24px', marginBottom: '12px' }}>
+              ✦
+            </div>
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
+              AffiVideo <span style={{ color: '#059669' }}>AI</span>
+            </h1>
+            <p style={{ fontSize: '14px', color: '#64748b', marginTop: '6px' }}>
+              {isSignUp ? 'Tạo tài khoản mới để bắt đầu' : 'Đăng nhập để quản lý sáng tạo video'}
+            </p>
+          </div>
+
+          <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>Email</label>
+              <input
+                type="email"
+                placeholder="yours@example.com"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                required
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>Mật khẩu</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                required
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={authLoading}
+              style={{ width: '100%', padding: '14px', backgroundColor: '#059669', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: 'bold', cursor: authLoading ? 'not-allowed' : 'pointer', marginTop: '8px', transition: 'background 0.2s' }}
+            >
+              {authLoading ? '⏳ Đang xử lý...' : (isSignUp ? 'Tạo Tài Khoản' : 'Đăng Nhập Ngay')}
+            </button>
+          </form>
+
+          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+              style={{ background: 'none', border: 'none', color: '#059669', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+            >
+              {isSignUp ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký ngay'}
+            </button>
+          </div>
+
+        </div>
+
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div style={{ position: 'fixed', bottom: '24px', right: '24px', backgroundColor: '#0f172a', color: '#ffffff', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '14px', zIndex: 9999 }}>
+            {toastMessage}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ================= MAIN APP (HIỆN KHI ĐÃ ĐĂNG NHẬP) =================
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: 'sans-serif' }}>
       
@@ -301,7 +425,7 @@ export default function App() {
             Đang hoạt động
           </div>
 
-          {/* Nút Nạp Credits (Nhấp vào để bật Modal nạp) */}
+          {/* Nút Nạp Credits */}
           <button
             onClick={() => setShowPricingModal(true)}
             style={{
@@ -333,17 +457,17 @@ export default function App() {
               style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}
               title="Tài khoản của bạn"
             >
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'B'}
+              {user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
             </div>
 
             {/* Menu thả xuống khi click vào Avatar */}
             {showUserMenu && (
               <div style={{ position: 'absolute', right: 0, top: '44px', width: '220px', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', padding: '12px', zIndex: 1000 }}>
                 <p style={{ fontSize: '13px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {user?.name || 'Tài khoản Creator'}
+                  {user?.name || 'Creator'}
                 </p>
                 <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 12px 0', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {user?.email || 'user@affivideo.ai'}
+                  {user?.email}
                 </p>
                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <button
@@ -356,12 +480,7 @@ export default function App() {
                     ⚙️ Cài đặt tài khoản
                   </button>
                   <button
-                    onClick={async () => {
-                      setShowUserMenu(false)
-                      await supabase.auth.signOut()
-                      setUser(null)
-                      showToast('Đã đăng xuất thành công!')
-                    }}
+                    onClick={handleSignOut}
                     style={{ textAlign: 'left', background: '#fef2f2', border: 'none', padding: '8px', fontSize: '13px', color: '#dc2626', cursor: 'pointer', borderRadius: '6px', fontWeight: '600' }}
                   >
                     🚪 Đăng xuất
@@ -449,10 +568,10 @@ export default function App() {
         </main>
       </div>
 
-      {/* Modal Nạp Credits (Bật lên khi bấm vào nút Credits trên Header) */}
+      {/* Modal Nạp Credits (Bao gồm 3 Gói Nạp: Cơ bản, Chuyên nghiệp & VIP) */}
       {showPricingModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '32px', maxWidth: '500px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', position: 'relative' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '32px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', position: 'relative' }}>
             
             <button
               onClick={() => setShowPricingModal(false)}
@@ -465,6 +584,8 @@ export default function App() {
             <p style={{ fontSize: '14px', color: '#64748b', textAlign: 'center', marginBottom: '24px' }}>Chọn gói credits phù hợp để tiếp tục tạo video tự động hàng loạt.</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+              
+              {/* Gói 1 */}
               <div 
                 onClick={() => {
                   setCredits(prev => prev + 100)
@@ -480,6 +601,7 @@ export default function App() {
                 <span style={{ fontWeight: 'bold', color: '#059669', fontSize: '16px' }}>99.000đ</span>
               </div>
 
+              {/* Gói 2 */}
               <div 
                 onClick={() => {
                   setCredits(prev => prev + 500)
@@ -494,6 +616,23 @@ export default function App() {
                 </div>
                 <span style={{ fontWeight: 'bold', color: '#2563eb', fontSize: '16px' }}>399.000đ</span>
               </div>
+
+              {/* Gói 3 (Gói VIP Mới Thêm) */}
+              <div 
+                onClick={() => {
+                  setCredits(prev => prev + 1000)
+                  setShowPricingModal(false)
+                  showToast('Nạp thành công 1.000 Credits VIP vào tài khoản!')
+                }}
+                style={{ padding: '16px', border: '2px solid #8b5cf6', borderRadius: '12px', cursor: 'pointer', backgroundColor: '#f5f3ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <div>
+                  <p style={{ fontWeight: 'bold', color: '#5b21b6', margin: 0 }}>Gói VIP Doanh Nghiệp (1.000 Credits) 👑</p>
+                  <p style={{ fontSize: '12px', color: '#6d28d9', margin: '2px 0 0 0' }}>Tạo khoảng 200 video ngắn + Ưu tiên AI</p>
+                </div>
+                <span style={{ fontWeight: 'bold', color: '#7c3aed', fontSize: '16px' }}>699.000đ</span>
+              </div>
+
             </div>
 
             <button
@@ -506,9 +645,9 @@ export default function App() {
         </div>
       )}
 
-      {/* Toast Notification (Thông báo nổi) */}
+      {/* Toast Notification */}
       {toastMessage && (
-        <div style={{ position: 'fixed', bottom: '24px', right: '24px', backgroundColor: '#0f172a', color: '#ffffff', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', fontSize: '14px', zIndex: 9999 }}>
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', backgroundColor: '#0f172a', color: '#ffffff', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '14px', zIndex: 9999 }}>
           {toastMessage}
         </div>
       )}
