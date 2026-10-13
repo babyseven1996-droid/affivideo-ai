@@ -584,6 +584,7 @@ export default function App() {
 
           {tab === 'settings' && (
             <VoiceSettings
+              user={user}
               credits={credits}
               voices={voices}
               onOpenPricing={() => setShowPricingModal(true)}

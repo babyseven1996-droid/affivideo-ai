@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { UserProfile } from '../App'
 
 interface VoiceSettingsProps {
+  user: UserProfile
   credits: number
   voices: string[]
   onOpenPricing: () => void
@@ -11,6 +13,7 @@ interface VoiceSettingsProps {
 }
 
 export default function VoiceSettings({
+  user,
   credits,
   voices,
   onOpenPricing,
@@ -25,11 +28,10 @@ export default function VoiceSettings({
   })
   const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null)
 
-  // Kiểm tra trạng thái kết nối mạng xã hội từ Supabase khi load trang
+  // Kiểm tra trạng thái kết nối mạng xã hội từ Supabase bằng user.id
   useEffect(() => {
     async function checkSocialConnections() {
-      const { data: { user } } = await supabase.auth.getSession()
-      if (!user) return
+      if (!user?.id) return
 
       const { data, error } = await supabase
         .from('social_accounts')
@@ -46,23 +48,20 @@ export default function VoiceSettings({
       }
     }
     checkSocialConnections()
-  }, [])
+  }, [user])
 
   // Xử lý Liên kết tài khoản OAuth (TikTok / Facebook)
   const handleConnectPlatform = async (platform: 'tiktok' | 'facebook') => {
     setLoadingPlatform(platform)
-    const { data: { user } } = await supabase.auth.getSession()
     
-    if (!user) {
+    if (!user?.id) {
       onToast('Vui lòng đăng nhập lại!')
       setLoadingPlatform(null)
       return
     }
 
     try {
-      // Giả lập quá trình chuyển hướng OAuth cấp quyền & nhận token thành công
-      // (Khi bạn có Developer App ID chính thức, bạn sẽ thay link này bằng URL OAuth của TikTok/Meta)
-      await new Promise((r) => setTimeout(r, 1500))
+      await new Promise((r) => setTimeout(r, 1200))
 
       const mockToken = `access_token_${platform}_${Date.now()}`
       const mockAccountName = platform === 'tiktok' ? '@creator_tiktok_vn' : 'Page Facebook Reels Pro'
@@ -85,6 +84,7 @@ export default function VoiceSettings({
       setConnectedPlatforms((prev) => ({ ...prev, [platform]: true }))
       onToast(`🎉 Liên kết thành công tài khoản ${platform === 'tiktok' ? 'TikTok' : 'Facebook'}!`)
     } catch (err: any) {
+      console.error(err)
       onToast(err.message || 'Lỗi liên kết tài khoản!')
     } finally {
       setLoadingPlatform(null)
@@ -93,8 +93,7 @@ export default function VoiceSettings({
 
   // Ngắt kết nối mạng xã hội
   const handleDisconnectPlatform = async (platform: 'tiktok' | 'facebook') => {
-    const { data: { user } } = await supabase.auth.getSession()
-    if (!user) return
+    if (!user?.id) return
 
     try {
       const { error } = await supabase
@@ -127,7 +126,7 @@ export default function VoiceSettings({
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
-      {/* PHẦN 1: LIÊN KẾT TÀI KHOẢN MẠNG XÃ HỘI (OAUTH) */}
+      {/* PHẦN 1: LIÊN KẾT TÀI KHOẢN MẠNG XÃ HỘI */}
       <div style={{ background: '#ffffff', padding: '28px', borderRadius: '20px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 6px 0' }}>
           🔗 Liên Kết Tài Khoản Đăng Bài Tự Động
