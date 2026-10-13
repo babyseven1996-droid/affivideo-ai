@@ -8,7 +8,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_CREATOMATE_API_KEY}`,
+        'Authorization': `Bearer c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a3ea7dc6e8213c1acf920952bc`,
       },
       body: JSON.stringify({
         template_id: 'c1ffdb12-a26c-49db-9046-b84f67d89e0e', // ID Template đã chọn
