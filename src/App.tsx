@@ -194,29 +194,33 @@ export default function App() {
   }
 
   // Lưu Video mới tạo
+  // Hàm Lưu Video Vĩnh Viễn vào Database Supabase
   const handleSaveNewVideo = async (title: string, script: string, videoUrl?: string, image?: string) => {
     const chosenImage = image || FALLBACK_PRODUCT_IMAGES[Math.floor(Math.random() * FALLBACK_PRODUCT_IMAGES.length)]
-    
+    const finalVideoUrl = videoUrl || 'https://www.w3schools.com/html/mov_bbb.mp4'
+
     const tempVideo: VideoRecord = {
       id: `vid_${Date.now()}`,
-      title: title || 'Video Affiliate Mới',
+      title: title || 'Video Reup Affiliate',
       script: script || '',
       status: 'completed',
-      videoUrl: videoUrl || 'https://www.w3schools.com/html/mov_bbb.mp4',
+      videoUrl: finalVideoUrl,
       createdAt: new Date().toISOString(),
       date: new Date().toLocaleDateString('vi-VN'),
       credits: 5,
       price: '0đ',
       image: chosenImage,
-      voice: voices[0],
+      voice: voices[0] || 'Nam miền Bắc trầm ấm',
     }
 
+    // 1. Cập nhật ngay lên giao diện màn hình
     setVideos((prev) => [tempVideo, ...prev])
-    showToast('Đã lưu video vào Kho video thành công!')
+    showToast('Đã tạo và lưu video vào Kho thành công!')
 
+    // 2. LƯU TRỰC TIẾP VÀO DATABASE SUPABASE CỦA NGƯỜI DÙNG (Giúp chống mất khi Reload/F5)
     try {
       if (user?.id) {
-        await supabase.from('videos').insert([
+        const { data, error } = await supabase.from('videos').insert([
           {
             user_id: user.id,
             title: tempVideo.title,
@@ -226,9 +230,16 @@ export default function App() {
             image_url: tempVideo.image,
           },
         ])
+
+        if (error) {
+          console.error('Lỗi khi lưu video vào Supabase:', error.message)
+        } else {
+          // Tải lại danh sách chuẩn từ Supabase để đồng bộ ID
+          fetchSupabaseVideos()
+        }
       }
     } catch (err) {
-      console.error('Save to Supabase error:', err)
+      console.error('Lỗi kết nối CSDL:', err)
     }
   }
 
