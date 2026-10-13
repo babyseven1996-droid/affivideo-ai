@@ -40,44 +40,77 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
         return
       }
 
+      // 3. XỬ LÝ ĐĂNG BÀI REELS CHO FACEBOOK FANPAGE (CHUẨN CHỈNH)
       if (platform === 'facebook') {
         const userAccessToken = socialAcc.access_token
 
-        onToast('🔍 Đang lấy thông tin Fanpage...')
+        onToast('🔍 Đang lấy danh sách Fanpage Facebook...')
+        
+        // Lấy danh sách Fanpage
         const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${userAccessToken}`)
         const pagesData = await pagesRes.json()
 
-        if (pagesData.error || !pagesData.data?.length) {
-          onToast(`❌ Lỗi Fanpage: ${pagesData.error?.message || 'Không tìm thấy Page'}`)
+        if (pagesData.error) {
+          onToast(`❌ Lỗi token Facebook: ${pagesData.error.message}`)
+          setIsPosting(null)
+          return
+        }
+
+        if (!pagesData.data || pagesData.data.length === 0) {
+          onToast('⚠️ Tài khoản Facebook của bạn chưa quản lý Fanpage nào!')
           setIsPosting(null)
           return
         }
 
         const targetPage = pagesData.data[0]
-        onToast(`🚀 Đang gửi video Reels lên "${targetPage.name}"...`)
+        const pageId = targetPage.id
+        const pageAccessToken = targetPage.access_token
 
-        // Gửi yêu cầu đăng Reels
-        const publishRes = await fetch(`https://graph.facebook.com/v18.0/${targetPage.id}/video_reels`, {
+        onToast(`🚀 Đang khởi tạo phiên đăng Reels trên Fanpage "${targetPage.name}"...`)
+
+        // BƯỚC 1: Khởi tạo phiên Reels chuẩn Meta API (Bắt buộc dùng upload_phase: 'start' đơn thuần)
+        const initRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             upload_phase: 'start',
-            access_token: targetPage.access_token,
+            access_token: pageAccessToken,
+          }),
+        })
+        const initData = await initRes.json()
+
+        if (initData.error || !initData.video_id) {
+          console.error('Lỗi khởi tạo Reels:', initData)
+          onToast(`❌ Lỗi từ Facebook: ${initData.error?.message || 'Không thể tạo phiên Reels'}`)
+          setIsPosting(null)
+          return
+        }
+
+        const videoId = initData.video_id
+        onToast(`📤 Đang tải video lên Facebook (Video ID: ${videoId})...`)
+
+        // BƯỚC 2: Hoàn tất và xuất bản Reels công khai kèm file_url chuẩn định dạng POST
+        const publishRes = await fetch(`https://graph.facebook.com/v18.0/${pageId}/video_reels`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            upload_phase: 'finish',
+            access_token: pageAccessToken,
+            video_id: videoId,
             video_state: 'PUBLISHED',
-            description: video.title || 'Video Reels #viral',
+            description: video.title || 'Video Reels tự động #viral #reels',
             file_url: video.videoUrl,
           }),
         })
         const publishData = await publishRes.json()
 
-        // In kết quả chi tiết ra F12 -> Console để kiểm tra
-        console.log('Facebook API Response:', publishData)
+        console.log('Facebook Publish Response:', publishData)
 
-        if (publishData.video_id || publishData.id) {
-          onToast(`🎉 Đã tạo tiến trình Reels thành công! (ID: ${publishData.video_id || publishData.id})`)
+        if (publishData.success || publishData.id) {
+          onToast(`🎉 ĐÃ ĐĂNG REELS THÀNH CÔNG LÊN FANPAGE "${targetPage.name}"!`)
         } else {
-          const errMsg = publishData.error?.message || 'Lỗi không xác định'
-          onToast(`❌ Facebook từ chối: ${errMsg}`)
+          const errMsg = publishData.error?.message || 'Lỗi không xác định từ Facebook'
+          onToast(`❌ Không thể xuất bản: ${errMsg}`)
         }
 
       } else if (platform === 'tiktok') {
