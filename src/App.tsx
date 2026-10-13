@@ -290,11 +290,27 @@ export default function App() {
     }
   }
 
-  const handleDeleteVideo = (id: string) => {
-    setVideos((prev) => prev.filter((v) => v.id !== id))
-    showToast('Đã xóa video.')
-  }
+  const handleDeleteVideo = async (id: string) => {
+  try {
+    // 1. Gọi lệnh xóa vĩnh viễn khỏi bảng 'videos' trên Supabase
+    const { error } = await supabase
+      .from('videos')
+      .delete()
+      .eq('id', id);
 
+    if (error) {
+      console.error('❌ Lỗi xóa trên Supabase:', error.message);
+      showToast('Xóa thất bại do lỗi database!');
+      return;
+    }
+
+    // 2. Xóa thành công ở database thì mới cập nhật lại giao diện
+    setVideos((prev) => prev.filter((v) => v.id !== id));
+    showToast('🗑️ Đã xóa video thành công!');
+  } catch (err) {
+    console.error('❌ Lỗi hệ thống khi xóa:', err);
+  }
+  }
   // ==========================================
   // GIAO DIỆN 1: LANDING PAGE CHO KHÁCH VÃNG LAI (!user)
   // ==========================================
