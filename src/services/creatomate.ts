@@ -4,7 +4,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
   const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a3ea7dc6e8213c1acf920952bc';
 
   try {
-    console.log('🛡️ Đang khởi tạo Render bản Ultra HD tối ưu nhất (Màu sắc rực rỡ + Nét căng đỉnh cao)...');
+    console.log('🛡️ Đang khởi tạo Render chuẩn HD (Video chính nét gốc 100% + Nền mờ nghệ thuật)...');
 
     const response = await fetch('https://api.creatomate.com/v1/renders', {
       method: 'POST',
@@ -18,38 +18,41 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
           width: 1080,
           height: 1920,
           frame_rate: 30,
-          crf: 17, // 💡 Đã sửa chuẩn quy định của Creatomate (mức 17 là siêu nét tối đa)
+          crf: 17, // Chất lượng nén siêu nét chuẩn HD
           elements: [
             // ==========================================
             // LỚP 1: NỀN MỜ PHÍA SAU (Background Blur)
+            // - Phủ kín màn hình dọc 9:16, làm mờ sâu và tối nền
             // ==========================================
             {
               type: 'video',
               source: videoUrl,
               time: 0,
               fit: 'cover',
-              blur_radius: 50,
-              brightness: '40%',    // Làm tối sâu nền để làm nổi bật video chính phía trên
+              blur_radius: 60,
+              brightness: '40%',
               volume: '0%',
             },
 
             // ==========================================
-            // LỚP 2: VIDEO CHÍNH (Siêu nét + Màu sắc rực rỡ)
+            // LỚP 2: VIDEO CHÍNH / NHÂN VẬT (Foreground - Nét Căng Nguyên Bản)
+            // - Dùng fit: 'contain' để giữ trọn vẹn độ nét và khung hình gốc, không bị vỡ ảnh
+            // - Lật gương + Tăng tốc + Màu sắc rực rỡ sống động
             // ==========================================
             {
               type: 'video',
               source: videoUrl,
               time: 0,
-              fit: 'cover',         // Phủ kín màn hình 9:16, to rõ và sắc nét tuyệt đối
-              speed: '104%',        // Lách âm thanh
-              x_scale: '-100%',     // Lật gương hình ảnh
+              fit: 'contain',       // 💡 QUAN TRỌNG: Giúp video sắc nét tuyệt đối, không bị phóng to vỡ hình
+              speed: '104%',        // Lách âm thanh bản quyền
+              x_scale: '-100%',     // Lật gương ngang chống nhận diện hình ảnh
 
               // MÀU SẮC RỰC RỠ & SỐNG ĐỘNG (Color Grading chuyên nghiệp)
-              contrast: '120%',     // Tăng tương phản mạnh giúp hình ảnh sắc bén, có chiều sâu
-              saturation: '130%',   // Tăng độ rực màu lên 30% giúp màu sắc cực kỳ bắt mắt, tươi tắn
-              brightness: '105%',   // Tăng sáng nhẹ giúp video bừng sáng, không bị tối
+              contrast: '115%',     // Tăng tương phản vừa đủ giúp hình ảnh sắc bén, có chiều sâu
+              saturation: '125%',   // Tăng độ rực màu giúp video tươi tắn, bắt mắt hơn hẳn gốc
+              brightness: '103%',   // Tăng sáng nhẹ nhàng
 
-              // ZOOM ĐỘNG MƯỢT MÀ (Phóng từ 100% -> 115%)
+              // ZOOM ĐỘNG CỰC NHẸ (Chỉ zoom từ 100% lên 105% để tránh làm mờ vỡ hình)
               animations: [
                 {
                   time: 0,
@@ -57,13 +60,13 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
                   type: 'scale',
                   easing: 'linear',
                   start_scale: '100%',
-                  end_scale: '115%',
+                  end_scale: '105%',
                 }
               ]
             },
 
             // ==========================================
-            // LỚP 3: LỚP PHỦ HẠT NHIỄU ĐIỆN ẢNH (Film Grain)
+            // LỚP 3: PHỦ NHIỄU ĐIỆN ẢNH SIÊU MỜ (Chống quét Byte Hash)
             // ==========================================
             {
               type: 'shape',
@@ -71,7 +74,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
               width: '100%',
               height: '100%',
               fill_color: '#ffffff',
-              opacity: '2%',        // Phủ nhiễu siêu mờ chống quét Byte Hash
+              opacity: '2%',
             }
           ],
         },
@@ -114,7 +117,7 @@ async function pollRenderStatus(renderId: string, apiKey: string, fallbackUrl: s
       console.log(`⌛ [Lần ${attempts}/${maxAttempts}] Trạng thái Render: ${render.status}`);
 
       if (render.status === 'succeeded' && render.url) {
-        console.log('🎉 XÀO NẤU THÀNH CÔNG ULTRA HD:', render.url);
+        console.log('🎉 XÀO NẤU THÀNH CÔNG (NÉ TƯƠI - NÉT CĂNG):', render.url);
         return render.url;
       }
       if (render.status === 'failed') {
