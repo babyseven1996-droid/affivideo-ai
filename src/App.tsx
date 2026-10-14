@@ -566,8 +566,7 @@ const fetchSupabaseVideos = async () => {
           {tab === 'create' && (
             <CreateVideo
               credits={credits}
-              voices={voices}
-              onVideoCreated={handleSaveNewVideo}
+              user={user}
               onSpendCredits={(amount) => {
                 if (credits < amount) {
                   showToast('Hết credits! Vui lòng nạp thêm.')
