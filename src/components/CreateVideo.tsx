@@ -12,6 +12,7 @@ interface CreateVideoProps {
   onSpendCredits?: (amount: number) => void;
 }
 
+
 export default function CreateVideo({
   user,
   credits,
@@ -99,6 +100,7 @@ export default function CreateVideo({
   };
 
   // 2. Upload file MP4 / Douyin lên Supabase Storage
+  // 2. Upload file MP4 / Douyin lên Supabase Storage
   const processSelectedFile = async (file: File) => {
     if (!file) return;
 
@@ -113,14 +115,20 @@ export default function CreateVideo({
     }
 
     setIsProcessing(true);
-    setProcessStatus('📤 Đang tải video từ máy lên hệ thống...');
+    setProcessStatus('📤 Đang chuẩn hóa & tải video lên hệ thống...');
 
     try {
-      const fileName = `uploads/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      // 💡 LẤY ĐÔI FILE (Extension) VÀ LÀM SẠCH TÊN FILE TUYỆT ĐỐI
+      const fileExt = file.name.split('.').pop() || 'mp4';
+      // Tạo tên file an toàn 100%: chỉ chứa số và ký tự không dấu
+      const safeFileName = `uploads/vid_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
       
-      const { error } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from('videos')
-        .upload(fileName, file, { cacheControl: '3600', upsert: true });
+        .upload(safeFileName, file, { 
+          cacheControl: '3600', 
+          upsert: true 
+        });
 
       if (error) {
         console.error('Lỗi upload:', error);
@@ -129,24 +137,25 @@ export default function CreateVideo({
         return;
       }
 
-      const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(fileName);
+      const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(safeFileName);
       const publicUrl = publicUrlData.publicUrl;
 
-      const fileTitle = file.name.replace(/\.[^/.]+$/, "");
+      // Lấy tên hiển thị mặc định sạch sẽ
+      const rawCleanTitle = file.name.replace(/\.[^/.]+$/, "").replace(/[^\w\s\u00C0-\u1EF9]/gi, ' ');
       const formattedSize = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
 
       setPreviewData({
         playUrl: publicUrl,
         cover: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=300',
-        rawTitle: fileTitle,
+        rawTitle: rawCleanTitle || 'Video Douyin Reup',
         fileSize: formattedSize,
       });
 
-      if (!videoTitle) setVideoTitle(fileTitle);
+      if (!videoTitle) setVideoTitle(rawCleanTitle || 'Video Douyin Reup');
       notify('🎉 Upload file thành công! Sẵn sàng xào nấu.');
     } catch (err) {
       console.error('Lỗi upload:', err);
-      notify('❌ Tải file lên thất bại.');
+      notify('❌ Tải file lên thất bại do sự cố kết nối mạng.');
     } finally {
       setIsProcessing(false);
       setProcessStatus('');
@@ -186,9 +195,9 @@ export default function CreateVideo({
       setProcessStatus('✂️ Đang áp dụng thuật toán xào nấu Ultra HD qua Creatomate...');
       
       const safeVideoUrl = await renderAntiCopyrightVideo(previewData.playUrl, {
-        flip: autoFlip,
-        speed: changeSpeed,
-      });
+  flip: autoFlip,
+  speed: changeSpeed,
+} as any);
 
       setProcessStatus('🚀 Đang lưu video hoàn chỉnh vào Kho video...');
 

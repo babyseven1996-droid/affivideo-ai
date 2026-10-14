@@ -118,37 +118,31 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  const fetchSupabaseVideos = async () => {
-    if (!user) return
-    try {
-      const { data, error } = await supabase
-        .from('videos')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+  // Trong hàm fetchSupabaseVideos / fetchVideos:
+const fetchSupabaseVideos = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    let query = supabase.from('videos').select('*').order('created_at', { ascending: false });
 
-      if (error) throw error
-
-      if (data) {
-        const formattedList: VideoRecord[] = data.map((v: Record<string, any>, idx: number) => ({
-          id: v.id || `vid_${idx}`,
-          title: v.title || 'Video Affiliate AI',
-          script: v.script || '',
-          status: v.status || 'completed',
-          videoUrl: v.video_url || 'https://www.w3schools.com/html/mov_bbb.mp4',
-          createdAt: v.created_at || new Date().toISOString(),
-          date: new Date(v.created_at || Date.now()).toLocaleDateString('vi-VN'),
-          credits: 5,
-          price: '0đ',
-          image: v.image_url || FALLBACK_PRODUCT_IMAGES[idx % FALLBACK_PRODUCT_IMAGES.length],
-          voice: v.voice || voices[0],
-        }))
-        setVideos(formattedList)
-      }
-    } catch (err) {
-      console.error('Fetch videos error:', err)
+    // Nếu có user_id thì lọc theo user, nếu không thì lấy danh sách video chung/demo
+    if (user?.id) {
+      query = query.eq('user_id', user.id);
     }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Lỗi lấy danh sách video:', error.message);
+      return;
+    }
+
+    setVideos(data || []);
+  } catch (err) {
+    console.error('Lỗi kết nối Supabase:', err);
   }
+};
+  
 
   useEffect(() => {
     fetchSupabaseVideos()
