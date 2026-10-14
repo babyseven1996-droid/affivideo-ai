@@ -31,14 +31,22 @@ export default function CreateVideo({
   const [previewData, setPreviewData] = useState<{ playUrl: string; cover: string; rawTitle: string } | null>(null)
 
   // Xử lý chuẩn hóa link đầu vào
+  // 💡 HÀM CHUẨN HÓA & LỌC SẠCH LINK (Hỗ trợ cả TikTok & Douyin)
   const cleanAndExtractUrl = (rawUrl: string): string => {
-    let cleaned = rawUrl.trim()
-    const match = cleaned.match(/(https?:\/\/[^\s]+)/g)
+    if (!rawUrl) return '';
+    let cleaned = rawUrl.trim();
+    
+    // Tìm URL hợp lệ bắt đầu bằng http:// hoặc https://
+    const match = cleaned.match(/https?:\/\/[^\s]+/g);
     if (match && match.length > 0) {
-      cleaned = match[0]
+      let url = match[0];
+      // Loại bỏ các ký tự rác hoặc dấu câu thừa ở cuối link nếu có (như dấu chấm, phẩy, ngoặc...)
+      url = url.replace(/[)}\],，。！？;]+$/, '');
+      return url;
     }
-    return cleaned
-  }
+    
+    return cleaned;
+  };
 
   // 1. PHÂN TÍCH & BÓC TÁCH VIDEO THẬT
   const handleAnalyzeSourceVideo = async () => {
