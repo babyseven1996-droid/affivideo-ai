@@ -1,7 +1,7 @@
 // src/services/creatomate.ts
 
 export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string> {
-  // 🔑 Thay đoạn này bằng API Key thật của bạn:
+  // Đã điền chính xác API Key của bạn vào đây:
   const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a3ea7dc6e8213c1acf920952bc';
 
   try {
@@ -36,7 +36,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
             },
 
             // ==========================================
-            // LỚP 2: VIDEO CHÍNH (Áp dụng Kỹ thuật số 1)
+            // LỚP 2: VIDEO CHÍNH (Áp dụng Kỹ thuật số 1: Dynamic Zoom)
             // ==========================================
             {
               type: 'video',
@@ -47,15 +47,14 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
               speed: '104%',      // Lách âm thanh
               x_scale: '-100%',   // Lật gương hình ảnh
               
-              // 💡 KỸ THUẬT 1: HIỆU ỨNG PHÓNG TO ĐỘNG (DYNAMIC ZOOM)
-              // Video sẽ tự động zoom lớn dần đều từ 100% lên 112% xuyên suốt thời lượng video
+              // KỸ THUẬT 1: Hiệu ứng phóng to động mượt mà từ 100% lên 112%
               animations: [
                 {
                   type: 'scale',
                   easing: 'linear',
                   start_scale: '100%',
                   end_scale: '112%',
-                  duration: '100%', // Trải đều từ đầu đến cuối video
+                  duration: '100%',
                   fade: false
                 }
               ]
