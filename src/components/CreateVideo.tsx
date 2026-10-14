@@ -30,18 +30,32 @@ export default function CreateVideo({
   const [processStatus, setProcessStatus] = useState('')
   const [previewData, setPreviewData] = useState<{ playUrl: string; cover: string; rawTitle: string } | null>(null)
 
-  // Xử lý chuẩn hóa link đầu vào
-  // 💡 HÀM CHUẨN HÓA & LỌC SẠCH LINK (Hỗ trợ cả TikTok & Douyin)
+ // 💡 HÀM CHUẨN HÓA & BIẾN ĐỔI LINK DOUYIN/TIKTOK TỰ ĐỘNG
   const cleanAndExtractUrl = (rawUrl: string): string => {
     if (!rawUrl) return '';
     let cleaned = rawUrl.trim();
     
-    // Tìm URL hợp lệ bắt đầu bằng http:// hoặc https://
+    // Tìm URL hợp lệ
     const match = cleaned.match(/https?:\/\/[^\s]+/g);
     if (match && match.length > 0) {
       let url = match[0];
-      // Loại bỏ các ký tự rác hoặc dấu câu thừa ở cuối link nếu có (như dấu chấm, phẩy, ngoặc...)
+      // Loại bỏ ký tự rác cuối link nếu có
       url = url.replace(/[)}\],，。！？;]+$/, '');
+      
+      try {
+        const urlObj = new URL(url);
+        // Nếu là link Douyin dạng feed/khám phá có chứa modal_id
+        if (urlObj.hostname.includes('douyin.com')) {
+          const modalId = urlObj.searchParams.get('modal_id');
+          if (modalId) {
+            // Tự động chuyển hóa thành link video chuẩn xác của Douyin
+            return `https://www.douyin.com/video/${modalId}`;
+          }
+        }
+      } catch (e) {
+        // Bỏ qua lỗi parse URL nếu có
+      }
+      
       return url;
     }
     
