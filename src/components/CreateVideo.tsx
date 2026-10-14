@@ -141,7 +141,10 @@ export default function CreateVideo({
       };
 
       const renderResult = await renderAntiCopyrightVideo(renderOptions);
-      const finalVideoUrl = renderResult.url || renderResult.video_url || targetVideoUrl;
+      const rawUrl = renderResult.url || renderResult.video_url || renderResult.output?.url;
+const finalVideoUrl = (rawUrl && !rawUrl.endsWith('.jpg') && !rawUrl.endsWith('.png')) 
+  ? rawUrl 
+  : targetVideoUrl;
 
       if (user?.id) {
         await supabase.from('videos').insert([
