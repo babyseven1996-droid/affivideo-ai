@@ -1,7 +1,8 @@
 // src/services/creatomate.ts
 
 export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string> {
-  const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a';
+  // 🔑 HÃY DÁN SECRET API KEY THẬT CỦA BẠN VÀO TRONG DẤU NHÁY KÉP NÀY:
+  const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a3ea7dc6e8213c1acf920952bc';
 
   try {
     console.log('🛡️ Đang khởi tạo Render Full HD 1080p (Nền mờ nghệ thuật + Video chính sắc nét)...');
@@ -15,7 +16,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
       body: JSON.stringify({
         source: {
           output_format: 'mp4',
-          // 💡 BẮT BUỘC CÓ WIDTH & HEIGHT ĐỂ ÉP RENDER FULL HD (KHÔNG BAO GIỜ BỊ MỜ)
+          // Ép độ phân giải Full HD để video không bị mờ vỡ
           width: 1080,
           height: 1920,
           frame_rate: 30,
@@ -23,34 +24,29 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
             // ==========================================
             // LỚP 1: NỀN MỜ PHÍA SAU (Background Blur Layer)
             // ==========================================
-            // - Phủ kín khung hình 9:16 (cover)
-            // - Làm mờ mạnh (blur_radius: 50) + Tối nền (brightness: '50%') để làm nổi bật video chính
             {
               type: 'video',
               source: videoUrl,
               time: 0,
               duration: null,
               fit: 'cover',
-              blur_radius: 50,
-              brightness: '50%',
+              blur_radius: 50,      // Làm mờ sâu nghệ thuật
+              brightness: '50%',    // Làm tối nền để nổi bật nhân vật
               volume: '0%',
             },
 
             // ==========================================
             // LỚP 2: VIDEO CHÍNH / NHÂN VẬT (Foreground - Nét căng)
             // ==========================================
-            // - Giữ nguyên tỷ lệ gốc, không bị kéo dãn hay vỡ hình (contain)
-            // - Lật gương hoàn toàn (x_scale: '-100%') chống quét nhận diện hình ảnh
-            // - Tăng tốc nhẹ 1.04x (speed: '104%') chống quét âm thanh Content ID
             {
               type: 'video',
               source: videoUrl,
               time: 0,
               duration: null,
-              fit: 'contain',
+              fit: 'contain',       // Giữ nguyên tỷ lệ, sắc nét 100% không bị vỡ
               scale: '100%',
-              speed: '104%',
-              x_scale: '-100%', // 👈 Lật hình hoàn hảo ở đây
+              speed: '104%',        // Tăng tốc nhẹ lách bản quyền âm thanh
+              x_scale: '-100%',     // Lật gương hoàn toàn chống quét nhận diện hình ảnh
             },
           ],
         },
@@ -60,7 +56,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
     const data = await response.json();
 
     if (!response.ok) {
-      console.warn('⚠️ API Creatomate lỗi, dùng video gốc dự phòng:', data);
+      console.error('❌ Chi tiết lỗi từ Creatomate API:', data);
       return videoUrl;
     }
 
@@ -70,7 +66,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
     return await pollRenderStatus(renderId, apiKey, videoUrl);
 
   } catch (error) {
-    console.error('❌ Lỗi xào nấu video:', error);
+    console.error('❌ Lỗi kết nối xào nấu video:', error);
     return videoUrl;
   }
 }
@@ -97,10 +93,11 @@ async function pollRenderStatus(renderId: string, apiKey: string, fallbackUrl: s
         return render.url;
       }
       if (render.status === 'failed') {
+        console.error('❌ Creatomate render thất bại:', render.error_message);
         return fallbackUrl;
       }
     } catch (err) {
-      console.error(err);
+      console.error('Lỗi check render status:', err);
     }
   }
 
