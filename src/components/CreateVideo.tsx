@@ -187,7 +187,7 @@ export default function CreateVideo({
   };
 
   // 3. Thực thi Xào nấu & Lách bản quyền
-  const handleProcessReupVideo = async () => {
+  const renderAdvancedVideo = async () => {
     if (!previewData || !previewData.playUrl) {
       notify('Vui lòng chọn video trước khi xào nấu!');
       return;
@@ -451,7 +451,7 @@ export default function CreateVideo({
 
         {/* Nút hành động chính */}
         <button
-          onClick={handleProcessReupVideo}
+          onClick={renderAdvancedVideo}
           disabled={isProcessing || !previewData}
           style={{
             width: '100%',

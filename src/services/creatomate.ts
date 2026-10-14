@@ -1,5 +1,99 @@
 // src/services/creatomate.ts
+export async function renderAdvancedVideo({
+  videoUrl,
+  musicUrl,
+  voiceUrl,
+  captionText,
+  speed = 1.04,
+  horizontalFlip = true
+}: {
+  videoUrl: string;
+  musicUrl?: string;       // Link file nhạc nền (.mp3)
+  voiceUrl?: string;       // Link file giọng đọc TTS (.mp3 / .wav từ ElevenLabs, Edge-TTS...)
+  captionText?: string;    // Nội dung chú dẫn tự viết
+  speed?: number;          // Tốc độ video (vd: 1.04x)
+  horizontalFlip?: boolean;// Lật gương chống quét bản quyền
+}) {
+  const CREATOMATE_API_KEY = process.env.REACT_APP_CREATOMATE_API_KEY || 'API_KEY_CUA_BAN';
 
+  // 💡 Cấu hình timeline các lớp (Layers) render Ultra HD
+  const payload = {
+    output: {
+      format: 'mp4',
+      resolution: '1080p',
+      fps: 30
+    },
+    elements: [
+      // 1. 🎬 LỚP VIDEO GỐC (Đã tắt âm thanh, lật gương, tăng tốc)
+      {
+        type: 'video',
+        source: videoUrl,
+        volume: '0%',               // 👈 Tắt hoàn toàn tạp âm và tiếng gốc
+        speed: speed,               // 👈 Tăng tốc nhẹ tránh Content ID
+        horizontal_flip: horizontalFlip, // 👈 Lật gương chống quét bản quyền
+        fit: 'cover',
+        duration: 'fit'
+      },
+
+      // 2. 🎵 LỚP NHẠC NỀN (Background Music) - Âm lượng nhỏ (15-20%) để không lấn át voice
+      ...(musicUrl ? [{
+        type: 'audio',
+        source: musicUrl,
+        volume: '18%',              // 👈 Âm lượng nhạc nền vừa phải
+        trim_start: 0,
+        audio_fade_in: 1,           // Hiệu ứng nhạc nhỏ dần khi bắt đầu
+        audio_fade_out: 2           // Hiệu ứng nhạc nhỏ dần khi kết thúc
+      }] : []),
+
+      // 3. 🗣️ LỚP GIỌNG ĐỌC (Voiceover / TTS) - Âm lượng chuẩn 100%
+      ...(voiceUrl ? [{
+        type: 'audio',
+        source: voiceUrl,
+        volume: '100%',             // 👈 Âm lượng voice rõ nét
+        trim_start: 0
+      }] : []),
+
+      // 4. 📝 LỚP TEXT CHÚ DẪN TÙY CHỈNH (Hiển thị đẹp mắt ở gần đáy video)
+      ...(captionText ? [{
+        type: 'text',
+        text: captionText,
+        font_family: 'Roboto',
+        font_weight: '700',
+        font_size: 46,
+        fill_color: '#ffffff',
+        background_color: 'rgba(0, 0, 0, 0.65)', // Khung nền đen mờ giúp chữ nổi bật
+        background_padding: 24,
+        background_border_radius: 12,
+        y: '82%',                   // Đặt vị trí ở 82% chiều cao màn hình (phần dưới video)
+        width: '90%',
+        animations: [
+          {
+            time: 'intro',
+            type: 'fade',
+            duration: 0.4
+          }
+        ]
+      }] : [])
+    ]
+  };
+
+  const response = await fetch('https://api.creatomate.com/v1/renders', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CREATOMATE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `Lỗi Render Creatomate: ${response.status}`);
+  }
+
+  const renderResult = await response.json();
+  return renderResult; // Trả về thông tin render (render_id, status...)
+}
 export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string> {
   const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a3ea7dc6e8213c1acf920952bc';
 
@@ -80,7 +174,25 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
         },
       }),
     });
-
+// Ví dụ payload gửi sang Creatomate API
+const renderPayload = {
+  template: 'YOUR_TEMPLATE_ID', // hoặc định nghĩa cấu trúc timeline trực tiếp
+  modifications: {
+    "source_video": videoUrl,
+  },
+  // Hoặc nếu cấu hình trực tiếp qua elements:
+  elements: [
+    {
+      type: 'video',
+      source: videoUrl,
+      volume: '0%',             // 👈 Tắt hoàn toàn âm thanh gốc (Mute)
+      fit: 'cover',             // 👈 Phủ kín khung hình, tự động crop bớt viền để che bớt sub cũ nếu cần
+      speed: speedSetting,      // Tốc độ điều chỉnh (ví dụ 1.04x)
+      horizontal_flip: true     // Lật gương chống quét bản quyền
+    },
+    // Bạn có thể thêm các thành phần Text/Audio tùy chỉnh của riêng bạn ở đây
+  ]
+};
     const data = await response.json();
 
     if (!response.ok) {
