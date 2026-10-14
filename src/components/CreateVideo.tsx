@@ -1,30 +1,31 @@
 // src/components/CreateVideo.tsx
 import React, { useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { renderAntiCopyrightVideo } from '../services/creatomate';
 
 interface CreateVideoProps {
+  user: any;
   credits: number;
-  voices: any[];
-  onVideoCreated: (video: any) => void;
-  onSpendCredits: (amount: number) => void;
-  onToast: (msg: string) => void;
+  showToast: (msg: string) => void;
+  fetchSupabaseVideos: () => void;
+  onSpendCredits: (amount: number) => boolean;
 }
 
 export default function CreateVideo({
+  user,
   credits,
-  voices,
-  onVideoCreated,
+  showToast,
+  fetchSupabaseVideos,
   onSpendCredits,
-  onToast,
 }: CreateVideoProps) {
   const [sourceUrl, setSourceUrl] = useState('');
   const [videoTitle, setVideoTitle] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [processStatus, setProcessStatus] = useState('');
   
-  // Tùy chọn lách bản quyền
-  const [flipVideo, setFlipVideo] = useState(true);
-  const [speedUp, setSpeedUp] = useState(true);
+  // Checkbox lách bản quyền
+  const [autoFlip, setAutoFlip] = useState(true);
+  const [changeSpeed, setChangeSpeed] = useState(true);
 
   const [previewData, setPreviewData] = useState<{
     playUrl: string;
@@ -32,7 +33,7 @@ export default function CreateVideo({
     rawTitle: string;
   } | null>(null);
 
-  // 💡 Hàm chuẩn hóa & lọc sạch link đầu vào (Hỗ trợ TikTok)
+  // Hàm làm sạch link
   const cleanAndExtractUrl = (rawUrl: string): string => {
     if (!rawUrl) return '';
     let cleaned = rawUrl.trim();
@@ -45,11 +46,11 @@ export default function CreateVideo({
     return cleaned;
   };
 
-  // 💡 Bước 1: Phân tích & Bóc tách video thật từ link TikTok
+  // Bước 1: Lấy video thật từ TikTok qua API
   const handleAnalyzeSourceVideo = async () => {
     const targetUrl = cleanAndExtractUrl(sourceUrl);
     if (!targetUrl) {
-      onToast('Vui lòng dán liên kết (URL) video hợp lệ');
+      showToast('Vui lòng dán liên kết (URL) video hợp lệ!');
       return;
     }
 
@@ -72,59 +73,76 @@ export default function CreateVideo({
         if (!videoTitle) {
           setVideoTitle(videoData.rawTitle);
         }
-        onToast('🎉 Lấy video gốc thành công!');
+        showToast('🎉 Lấy video gốc thành công!');
       } else {
-        onToast('❌ Không thể lấy dữ liệu video từ link này. Vui lòng kiểm tra lại!');
+        showToast('❌ Không thể lấy dữ liệu video từ link này.');
       }
     } catch (error) {
       console.error('Lỗi phân tích video:', error);
-      onToast('❌ Đã xảy ra lỗi kết nối khi lấy video.');
+      showToast('❌ Đã xảy ra lỗi kết nối khi lấy video.');
     } finally {
       setIsProcessing(false);
       setProcessStatus('');
     }
   };
 
-  // 💡 Bước 2: Bắt đầu Xào nấu & Lách bản quyền qua Creatomate API
-  const handleProcessReup = async () => {
+  // Bước 2: Xào nấu qua Creatomate & Lưu trực tiếp vào Supabase
+  const handleProcessReupVideo = async () => {
     if (!previewData || !previewData.playUrl) {
-      onToast('Vui lòng lấy video gốc trước khi bắt đầu!');
+      showToast('Vui lòng bấm nút "Lấy Video Thật" trước khi Reup!');
       return;
     }
 
-    if (credits < 5) {
-      onToast('⚠️ Bạn không đủ Credit (Cần tối thiểu 5 Credits)!');
+    const cost = 5;
+    if (credits < cost) {
+      showToast('⚠️ Bạn không đủ Credits để thực hiện!');
       return;
     }
 
     setIsProcessing(true);
-    setProcessStatus('🛡️ Đang áp dụng AI Lách bản quyền & Xào nấu Ultra HD...');
 
     try {
-      // Trừ credits trước
-      onSpendCredits(5);
+      setProcessStatus('✂️ Đang áp dụng thuật toán xào nấu Ultra HD qua Creatomate...');
+      
+      // Gọi hàm xào nấu kèm theo trạng thái checkbox của bạn
+      const safeVideoUrl = await renderAntiCopyrightVideo(previewData.playUrl, {
+        flip: autoFlip,
+        speed: changeSpeed,
+      });
 
-      // Gọi service xào nấu video qua Creatomate
-      const finalRenderedUrl = await renderAntiCopyrightVideo(previewData.playUrl);
+      setProcessStatus('🚀 Đang lưu video hoàn chỉnh vào Kho video (Supabase)...');
 
-      const newVideoRecord = {
-        id: Date.now().toString(),
-        title: videoTitle || previewData.rawTitle,
-        url: finalRenderedUrl,
-        cover: previewData.cover,
-        createdAt: new Date().toISOString(),
-      };
+      // Lưu vĩnh viễn vào bảng 'videos' trên Supabase
+      const { error } = await supabase
+        .from('videos')
+        .insert([{
+          user_id: user?.id,
+          title: videoTitle || previewData.rawTitle,
+          video_url: safeVideoUrl,
+          image_url: previewData.cover,
+          status: 'completed',
+        }]);
 
-      onVideoCreated(newVideoRecord);
-      onToast('🎉 Xào nấu và Lách bản quyền video thành công!');
+      if (error) {
+        console.error('Lỗi Supabase:', error.message);
+        showToast('❌ Lỗi lưu kho video trên database!');
+        setIsProcessing(false);
+        return;
+      }
+
+      // Trừ credits người dùng
+      onSpendCredits(cost);
+      fetchSupabaseVideos(); // Làm mới danh sách kho video
+
+      showToast('🎉 Đã xào nấu và lưu video thành công vào kho!');
       
       // Reset form
       setSourceUrl('');
       setVideoTitle('');
       setPreviewData(null);
-    } catch (error) {
-      console.error('Lỗi xử lý reup:', error);
-      onToast('❌ Quá trình xào nấu video thất bại.');
+    } catch (err) {
+      console.error('Lỗi xử lý Reup:', err);
+      showToast('❌ Quá trình xử lý video thất bại.');
     } finally {
       setIsProcessing(false);
       setProcessStatus('');
@@ -174,15 +192,14 @@ export default function CreateVideo({
                 borderRadius: '8px',
                 fontWeight: 600,
                 cursor: isProcessing ? 'not-allowed' : 'pointer',
-                transition: 'background 0.2s',
               }}
             >
-              {isProcessing ? 'Đang xử lý...' : 'Lấy Video Thật'}
+              Lấy Video Thật
             </button>
           </div>
         </div>
 
-        {/* Tiêu đề video mới */}
+        {/* Tiêu đề video */}
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px', color: '#333' }}>
             Tên Video / Tiêu đề mới:
@@ -204,18 +221,18 @@ export default function CreateVideo({
           />
         </div>
 
-        {/* Preview video nếu đã lấy thành công */}
+        {/* Preview video */}
         {previewData && (
           <div style={{ marginBottom: '20px', padding: '16px', background: '#f9f9f9', borderRadius: '8px', border: '1px solid #eee', display: 'flex', gap: '16px', alignItems: 'center' }}>
             <img src={previewData.cover} alt="Cover" style={{ width: '80px', height: '120px', objectFit: 'cover', borderRadius: '6px' }} />
             <div>
               <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#222' }}>{previewData.rawTitle}</h4>
-              <p style={{ margin: 0, fontSize: '13px', color: '#009955', fontWeight: 600 }}>✅ Đã sẵn sàng xào nấu chống bản quyền!</p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#009955', fontWeight: 600 }}>✅ Đã sẵn sàng xào nấu Ultra HD!</p>
             </div>
           </div>
         )}
 
-        {/* Cấu hình AI lách bản quyền */}
+        {/* Cấu hình lách bản quyền */}
         <div style={{ marginBottom: '24px', padding: '16px', background: '#fcfcfc', borderRadius: '8px', border: '1px solid #eaeaea' }}>
           <div style={{ fontWeight: 600, marginBottom: '12px', color: '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>⚙️</span> Cấu hình AI Lách Thuật Toán Bản Quyền:
@@ -224,8 +241,8 @@ export default function CreateVideo({
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px' }}>
               <input
                 type="checkbox"
-                checked={flipVideo}
-                onChange={(e) => setFlipVideo(e.target.checked)}
+                checked={autoFlip}
+                onChange={(e) => setAutoFlip(e.target.checked)}
                 style={{ width: '16px', height: '16px' }}
               />
               Lật gương video (Horizontal Flip)
@@ -233,8 +250,8 @@ export default function CreateVideo({
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px' }}>
               <input
                 type="checkbox"
-                checked={speedUp}
-                onChange={(e) => setSpeedUp(e.target.checked)}
+                checked={changeSpeed}
+                onChange={(e) => setChangeSpeed(e.target.checked)}
                 style={{ width: '16px', height: '16px' }}
               />
               Tăng tốc độ video nhẹ (1.04x)
@@ -242,16 +259,16 @@ export default function CreateVideo({
           </div>
         </div>
 
-        {/* Trạng thái xử lý */}
+        {/* Trạng thái */}
         {isProcessing && processStatus && (
           <div style={{ marginBottom: '16px', padding: '12px', background: '#e6f4ea', color: '#137333', borderRadius: '8px', textAlign: 'center', fontWeight: 500, fontSize: '14px' }}>
             ⏳ {processStatus}
           </div>
         )}
 
-        {/* Nút thực thi chính */}
+        {/* Nút thực thi */}
         <button
-          onClick={handleProcessReup}
+          onClick={handleProcessReupVideo}
           disabled={isProcessing || !previewData}
           style={{
             width: '100%',
@@ -264,7 +281,6 @@ export default function CreateVideo({
             fontWeight: 'bold',
             cursor: previewData && !isProcessing ? 'pointer' : 'not-allowed',
             boxShadow: previewData ? '0 4px 12px rgba(0, 176, 116, 0.25)' : 'none',
-            transition: 'background 0.2s',
           }}
         >
           {isProcessing ? '⏳ Đang xử lý Reup Video...' : '🚀 Bắt Đầu Reup & Lách Bản Quyền (Tốn 5 Credits)'}
