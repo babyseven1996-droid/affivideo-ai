@@ -6,14 +6,16 @@ import { renderAntiCopyrightVideo } from '../services/creatomate';
 interface CreateVideoProps {
   user: any;
   credits: number;
-  showToast: (msg: string) => void;
-  fetchSupabaseVideos: () => void;
-  onSpendCredits: (amount: number) => boolean;
+  onToast?: (msg: string) => void;
+  showToast?: (msg: string) => void;
+  fetchSupabaseVideos?: () => void;
+  onSpendCredits?: (amount: number) => void;
 }
 
 export default function CreateVideo({
   user,
   credits,
+  onToast,
   showToast,
   fetchSupabaseVideos,
   onSpendCredits,
@@ -33,6 +35,13 @@ export default function CreateVideo({
     rawTitle: string;
   } | null>(null);
 
+  // Hàm thông báo an toàn (hỗ trợ cả onToast và showToast)
+  const notify = (msg: string) => {
+    if (onToast) onToast(msg);
+    else if (showToast) showToast(msg);
+    else console.log(msg);
+  };
+
   // Hàm làm sạch link
   const cleanAndExtractUrl = (rawUrl: string): string => {
     if (!rawUrl) return '';
@@ -50,7 +59,7 @@ export default function CreateVideo({
   const handleAnalyzeSourceVideo = async () => {
     const targetUrl = cleanAndExtractUrl(sourceUrl);
     if (!targetUrl) {
-      showToast('Vui lòng dán liên kết (URL) video hợp lệ!');
+      notify('Vui lòng dán liên kết (URL) video hợp lệ!');
       return;
     }
 
@@ -73,13 +82,13 @@ export default function CreateVideo({
         if (!videoTitle) {
           setVideoTitle(videoData.rawTitle);
         }
-        showToast('🎉 Lấy video gốc thành công!');
+        notify('🎉 Lấy video gốc thành công!');
       } else {
-        showToast('❌ Không thể lấy dữ liệu video từ link này.');
+        notify('❌ Không thể lấy dữ liệu video từ link này.');
       }
     } catch (error) {
       console.error('Lỗi phân tích video:', error);
-      showToast('❌ Đã xảy ra lỗi kết nối khi lấy video.');
+      notify('❌ Đã xảy ra lỗi kết nối khi lấy video.');
     } finally {
       setIsProcessing(false);
       setProcessStatus('');
@@ -89,13 +98,13 @@ export default function CreateVideo({
   // Bước 2: Xào nấu qua Creatomate & Lưu trực tiếp vào Supabase
   const handleProcessReupVideo = async () => {
     if (!previewData || !previewData.playUrl) {
-      showToast('Vui lòng bấm nút "Lấy Video Thật" trước khi Reup!');
+      notify('Vui lòng bấm nút "Lấy Video Thật" trước khi Reup!');
       return;
     }
 
     const cost = 5;
     if (credits < cost) {
-      showToast('⚠️ Bạn không đủ Credits để thực hiện!');
+      notify('⚠️ Bạn không đủ Credits để thực hiện!');
       return;
     }
 
@@ -104,7 +113,7 @@ export default function CreateVideo({
     try {
       setProcessStatus('✂️ Đang áp dụng thuật toán xào nấu Ultra HD qua Creatomate...');
       
-      // Gọi hàm xào nấu kèm theo trạng thái checkbox của bạn
+      // Gọi hàm xào nấu kèm theo trạng thái checkbox
       const safeVideoUrl = await renderAntiCopyrightVideo(previewData.playUrl, {
         flip: autoFlip,
         speed: changeSpeed,
@@ -112,11 +121,14 @@ export default function CreateVideo({
 
       setProcessStatus('🚀 Đang lưu video hoàn chỉnh vào Kho video (Supabase)...');
 
+      // Lấy id người dùng chuẩn xác (hoặc lấy từ session nếu user prop trống)
+      const currentUserId = user?.id || (await supabase.auth.getUser()).data.user?.id;
+
       // Lưu vĩnh viễn vào bảng 'videos' trên Supabase
       const { error } = await supabase
         .from('videos')
         .insert([{
-          user_id: user?.id,
+          user_id: currentUserId || null,
           title: videoTitle || previewData.rawTitle,
           video_url: safeVideoUrl,
           image_url: previewData.cover,
@@ -125,16 +137,16 @@ export default function CreateVideo({
 
       if (error) {
         console.error('Lỗi Supabase:', error.message);
-        showToast('❌ Lỗi lưu kho video trên database!');
+        notify(`❌ Lỗi lưu kho Supabase: ${error.message}`);
         setIsProcessing(false);
         return;
       }
 
-      // Trừ credits người dùng
-      onSpendCredits(cost);
-      fetchSupabaseVideos(); // Làm mới danh sách kho video
+      // Trừ credits & làm mới kho video nếu có hàm truyền vào
+      if (onSpendCredits) onSpendCredits(cost);
+      if (fetchSupabaseVideos) fetchSupabaseVideos();
 
-      showToast('🎉 Đã xào nấu và lưu video thành công vào kho!');
+      notify('🎉 Đã xào nấu và lưu video thành công vào kho!');
       
       // Reset form
       setSourceUrl('');
@@ -142,7 +154,7 @@ export default function CreateVideo({
       setPreviewData(null);
     } catch (err) {
       console.error('Lỗi xử lý Reup:', err);
-      showToast('❌ Quá trình xử lý video thất bại.');
+      notify('❌ Quá trình xử lý video thất bại.');
     } finally {
       setIsProcessing(false);
       setProcessStatus('');
