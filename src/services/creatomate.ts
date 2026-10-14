@@ -19,37 +19,33 @@ export async function renderAntiCopyrightVideo(options: RenderOptions) {
   const isFlip = options.enableFlip ?? true;
   const isMute = options.muteOriginalAudio ?? true;
 
-  // 1. Cấu hình mảng các lớp video gốc
   const elements: any[] = [
     {
       type: 'video',
       source: options.videoUrl,
-      volume: isMute ? '0%' : '100%', // Tắt tiếng hoặc giữ nguyên tiếng gốc
+      volume: isMute ? '0%' : '100%',
       speed: speedVal,
       horizontal_flip: isFlip,
       fit: 'cover',
     },
   ];
 
-  // 2. Thêm Nhạc Nền MP3 (nếu người dùng đã upload)
   if (options.bgMusicUrl && options.bgMusicUrl.trim() !== '') {
     elements.push({
       type: 'audio',
       source: options.bgMusicUrl.trim(),
-      volume: '18%', // Âm lượng nhạc nền 18% vừa phải
+      volume: '18%',
     });
   }
 
-  // 3. Thêm Giọng Đọc Voice AI / TTS (nếu người dùng đã upload)
   if (options.voiceUrl && options.voiceUrl.trim() !== '') {
     elements.push({
       type: 'audio',
       source: options.voiceUrl.trim(),
-      volume: '100%', // Âm lượng voice rõ nét 100%
+      volume: '100%',
     });
   }
 
-  // 4. Thêm Subtitle / Chú Dẫn Text Tự Viết
   if (options.customCaption && options.customCaption.trim() !== '') {
     elements.push({
       type: 'text',
@@ -66,6 +62,7 @@ export async function renderAntiCopyrightVideo(options: RenderOptions) {
     });
   }
 
+  // 1. Gửi request khởi tạo quá trình render
   const response = await fetch('https://api.creatomate.com/v1/renders', {
     method: 'POST',
     headers: {
@@ -78,7 +75,6 @@ export async function renderAntiCopyrightVideo(options: RenderOptions) {
         resolution: '1080p',
         fps: 30,
       },
-      // 💡 Đưa elements vào trong cấu trúc source composition chuẩn của Creatomate
       source: {
         type: 'composition',
         elements: elements,
@@ -91,11 +87,38 @@ export async function renderAntiCopyrightVideo(options: RenderOptions) {
     throw new Error(errorJson.message || `Lỗi Render Creatomate HTTP ${response.status}`);
   }
 
-  const resultData = await response.json();
-  
-  if (Array.isArray(resultData) && resultData.length > 0) {
-    return resultData[0];
+  let renderData = await response.json();
+  let renderObj = Array.isArray(renderData) ? renderData[0] : renderData;
+  const renderId = renderObj?.id;
+
+  if (!renderId) {
+    return renderObj;
   }
 
-  return resultData;
+  // 2. Tự động kiểm tra trạng thái liên tục (Polling) mỗi 3 giây cho đến khi render xong
+  let attempts = 0;
+  while (attempts < 60) {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    attempts++;
+
+    const statusRes = await fetch(`https://api.creatomate.com/v1/renders/${renderId}`, {
+      headers: {
+        'Authorization': `Bearer ${CREATOMATE_API_KEY}`,
+      },
+    });
+
+    if (statusRes.ok) {
+      const statusData = await statusRes.json();
+      renderObj = Array.isArray(statusData) ? statusData[0] : statusData;
+
+      if (renderObj.status === 'completed') {
+        return renderObj; // Trả về object chứa URL hoàn chỉnh 100%
+      }
+      if (renderObj.status === 'failed') {
+        throw new Error('Quá trình render video trên Creatomate bị lỗi.');
+      }
+    }
+  }
+
+  throw new Error('Quá trình render video quá thời gian chờ (Timeout).');
 }
