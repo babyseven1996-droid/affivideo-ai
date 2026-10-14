@@ -15,7 +15,9 @@ export async function renderAntiCopyrightVideo(options: RenderOptions) {
     (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_CREATOMATE_API_KEY) ||
     'YOUR_CREATOMATE_API_KEY';
 
-  const speedVal = options.speed ?? 1.04;
+  // 💡 Đổi cách tính speed thành phần trăm chuẩn (VD: 1.04x tương ứng với 104)
+  const speedMultiplier = options.speed ?? 1.04;
+  const speedVal = Math.round(speedMultiplier * 100); // Sẽ ra số 104
   const isFlip = options.enableFlip ?? true;
   const isMute = options.muteOriginalAudio ?? true;
 
