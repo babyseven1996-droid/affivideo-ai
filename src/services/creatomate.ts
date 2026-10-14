@@ -1,10 +1,11 @@
 // src/services/creatomate.ts
 
 export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string> {
-  const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a';
+  // Ưu tiên biến môi trường trên Vercel, nếu không có sẽ tự động lấy Key trực tiếp bên dưới
+  const apiKey = import.meta.env.VITE_CREATOMATE_API_KEY || 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a';
 
   try {
-    console.log('🛡️ Đang khởi tạo Render Pipeline xào nấu chuyên nghiệp (Deep Remix)...');
+    console.log('🛡️ Đang gọi API xào nấu video...');
 
     const response = await fetch('https://api.creatomate.com/v1/renders', {
       method: 'POST',
@@ -19,12 +20,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
           height: 1920,
           frame_rate: 30,
           elements: [
-            // ==========================================
-            // LỚP 1: NỀN MỜ NGHỆ THUẬT (Background Layer)
-            // ==========================================
-            // - Phóng to phủ kín khung hình 9:16
-            // - Làm mờ mạnh (blur_radius: 40) + Giảm tối (brightness: '60%') để nổi bật chủ thể
-            // - Tắt âm lượng lớp nền (volume: '0%') tránh bị rè âm thanh
+            // Lớp 1: Nền mờ nghệ thuật (Background)
             {
               type: 'video',
               source: videoUrl,
@@ -35,14 +31,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
               brightness: '60%',
               volume: '0%',
             },
-
-            // ==========================================
-            // LỚP 2: VIDEO CHÍNH / NHÂN VẬT (Foreground Layer)
-            // ==========================================
-            // - Lật ngang hoàn toàn (x_scale: '-100%'): Đánh lừa tuyệt đối thuật toán nhận diện pixel của Meta/TikTok
-            // - Tăng tốc nhẹ 1.04x (speed: '104%'): Phá vỡ Audio Fingerprint & Time-matching chống quét âm thanh
-            // - Zoom nhẹ 104% (scale: '104%'): Cắt sạch viền logo, watermark góc video gốc
-            // - Giữ nguyên độ nét 100%, tuyệt đối không làm mờ lớp này
+            // Lớp 2: Video chính / Nhân vật (Foreground - Lật gương + Tăng tốc + Zoom)
             {
               type: 'video',
               source: videoUrl,
@@ -51,7 +40,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
               fit: 'contain',
               scale: '104%',
               speed: '104%',
-              x_scale: '-100%', // 👈 Đã khôi phục tính năng lật gương cực mạnh ở đây!
+              x_scale: '-100%',
             },
           ],
         },
@@ -59,28 +48,27 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
     });
 
     const data = await response.json();
-    console.log('✨ Response từ Creatomate API:', data);
 
     if (!response.ok) {
-      console.error('❌ Creatomate API trả về lỗi HTTP:', data);
-      return videoUrl;
+      console.warn('⚠️ API Creatomate phản hồi lỗi (401/400). Đang chuyển về chế độ dự phòng an toàn:', data);
+      return videoUrl; // Trả về video gốc an toàn, không làm lỗi app
     }
 
     const renderId = Array.isArray(data) ? data[0]?.id : data?.id;
     if (!renderId) return videoUrl;
 
-    // 3. Chờ Server Creatomate xử lý xong hoàn toàn rồi trả về link chuẩn
+    // Chờ render hoàn tất
     return await pollRenderStatus(renderId, apiKey, videoUrl);
 
   } catch (error) {
-    console.error('❌ Lỗi ngoại lệ khi xào nấu video:', error);
-    return videoUrl;
+    console.error('❌ Lỗi kết nối xào nấu video:', error);
+    return videoUrl; // Fallback an toàn tuyệt đối
   }
 }
 
 // Hàm chờ render hoàn tất (Polling)
 async function pollRenderStatus(renderId: string, apiKey: string, fallbackUrl: string): Promise<string> {
-  const maxAttempts = 30; // Chờ tối đa 60 giây
+  const maxAttempts = 25; // Chờ tối đa 50 giây
   let attempts = 0;
 
   while (attempts < maxAttempts) {
@@ -100,14 +88,13 @@ async function pollRenderStatus(renderId: string, apiKey: string, fallbackUrl: s
         return render.url;
       }
       if (render.status === 'failed') {
-        console.error('❌ Creatomate báo lỗi render:', render.error_message);
+        console.warn('⚠️ Render thất bại trên server, dùng video gốc.');
         return fallbackUrl;
       }
     } catch (err) {
-      console.error('Lỗi khi kiểm tra trạng thái render:', err);
+      console.error('Lỗi check render status:', err);
     }
   }
 
-  console.warn('⏰ Quá thời gian chờ render!');
   return fallbackUrl;
 }
