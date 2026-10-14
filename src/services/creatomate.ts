@@ -2,7 +2,7 @@
 
 export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string> {
   // 🔑 Thay đoạn này bằng API Key thật của bạn:
-  const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a3ea7dc6e8213c1acf920952bcaf7841a3ea7dc6e8213c1acf920952bc';
+  const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a3ea7dc6e8213c1acf920952bc';
 
   try {
     console.log('🛡️ Đang khởi tạo Render Kỹ thuật số 1 (Dynamic Zoom + Nền mờ Full HD)...');
