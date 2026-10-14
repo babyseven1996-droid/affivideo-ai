@@ -76,30 +76,28 @@ export default function CreateVideo({
 
     try {
       // Sử dụng API công khai để lấy video thực tế từ TikTok/Douyin/Shorts
-      const apiEndpoint = `https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`
-      const res = await fetch(apiEndpoint)
-      const json = await res.json()
+      // Trong hàm xử lý lấy video (handleAnalyzeSourceVideo):
+const apiEndpoint = `https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`;
+const res = await fetch(apiEndpoint);
+const json = await res.json();
 
-      if (json.code === 0 && json.data) {
-        const videoData = {
-          playUrl: json.data.play || json.data.wmplay,
-          cover: json.data.cover || json.data.origin_cover,
-          rawTitle: json.data.title || 'Video Reup Affiliate HOT',
-        }
-        setPreviewData(videoData)
-        setTitle(videoData.rawTitle)
-        onToast('✅ Bóc tách video gốc thành công!')
-      } else {
-        throw new Error('API không trả về dữ liệu video từ link này.')
-      }
-    } catch (err: any) {
-      console.error(err)
-      onToast('Không thể tải video từ link trang chủ này. Vui lòng dùng link chia sẻ trực tiếp (VD: https://vt.tiktok.com/... hoặc link video cụ thể)!')
-    } finally {
-      setIsProcessing(false)
-      setProcessStatus('')
-    }
+if (json.code === 0 && json.data) {
+  const videoData = {
+    playUrl: json.data.play || json.data.wmplay,
+    cover: json.data.cover || json.data.origin_cover,
+    rawTitle: json.data.title || 'Video Reup Affiliate HOT',
+  };
+  // ... xử lý tiếp dữ liệu thành công
+} else {
+  // 💡 Kiểm tra nếu là link Douyin thì đưa ra gợi ý cụ thể cho bạn
+  if (targetUrl.includes('douyin.com')) {
+    onToast('⚠️ Douyin đang chặn API tự động. Bạn hãy tải video Douyin về máy trước hoặc dùng link TikTok để tool chạy mượt nhất nhé!');
+  } else {
+    onToast('❌ Không thể lấy dữ liệu video từ link TikTok này.');
   }
+  setIsProcessing(false);
+  return;
+}
 
   // 2. REUP & LÁCH BẢN QUYỀN
   const handleProcessReupVideo = async () => {
