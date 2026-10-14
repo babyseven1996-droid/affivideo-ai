@@ -99,8 +99,7 @@ export default function CreateVideo({
     }
   };
 
-  // 2. Upload file MP4 / Douyin lên Supabase Storage
-  // 2. Upload file MP4 / Douyin lên Supabase Storage
+ // 2. Upload file MP4 / Douyin bằng REST API chống lỗi HTTP2 / Protocol Error
   const processSelectedFile = async (file: File) => {
     if (!file) return;
 
@@ -115,32 +114,43 @@ export default function CreateVideo({
     }
 
     setIsProcessing(true);
-    setProcessStatus('📤 Đang chuẩn hóa & tải video lên hệ thống...');
+    setProcessStatus('📤 Đang tải video lên hệ thống (Chế độ upload an toàn)...');
 
     try {
-      // 💡 LẤY ĐÔI FILE (Extension) VÀ LÀM SẠCH TÊN FILE TUYỆT ĐỐI
-      const fileExt = file.name.split('.').pop() || 'mp4';
-      // Tạo tên file an toàn 100%: chỉ chứa số và ký tự không dấu
-      const safeFileName = `uploads/vid_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+      // 💡 1. Đổi file thành ArrayBuffer để tránh rớt kết nối HTTP2
+      const arrayBuffer = await file.arrayBuffer();
       
-      const { data, error } = await supabase.storage
-        .from('videos')
-        .upload(safeFileName, file, { 
-          cacheControl: '3600', 
-          upsert: true 
-        });
+      const fileExt = file.name.split('.').pop() || 'mp4';
+      const cleanFileName = `vid_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+      const filePath = `uploads/${cleanFileName}`;
 
-      if (error) {
-        console.error('Lỗi upload:', error);
-        notify(`❌ Lỗi upload file: ${error.message}`);
-        setIsProcessing(false);
-        return;
+      // 💡 2. Lấy URL và Supabase Key trực tiếp từ Client SDK
+      const supabaseUrl = (supabase as any).supabaseUrl;
+      const supabaseKey = (supabase as any).supabaseKey;
+
+      const uploadEndpoint = `${supabaseUrl}/storage/v1/object/videos/${filePath}`;
+
+      // 💡 3. Upload bằng Fetch API trực tiếp (Khắc phục triệt để ERR_HTTP2_PROTOCOL_ERROR)
+      const res = await fetch(uploadEndpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'apikey': supabaseKey,
+          'Content-Type': file.type || 'video/mp4',
+          'x-upsert': 'true',
+        },
+        body: arrayBuffer,
+      });
+
+      if (!res.ok) {
+        const errorJson = await res.json().catch(() => ({}));
+        throw new Error(errorJson.message || `Lỗi Upload HTTP ${res.status}`);
       }
 
-      const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(safeFileName);
+      // Lấy URL công khai sau khi upload xong
+      const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(filePath);
       const publicUrl = publicUrlData.publicUrl;
 
-      // Lấy tên hiển thị mặc định sạch sẽ
       const rawCleanTitle = file.name.replace(/\.[^/.]+$/, "").replace(/[^\w\s\u00C0-\u1EF9]/gi, ' ');
       const formattedSize = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
 
@@ -153,9 +163,9 @@ export default function CreateVideo({
 
       if (!videoTitle) setVideoTitle(rawCleanTitle || 'Video Douyin Reup');
       notify('🎉 Upload file thành công! Sẵn sàng xào nấu.');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Lỗi upload:', err);
-      notify('❌ Tải file lên thất bại do sự cố kết nối mạng.');
+      notify(`❌ Tải file lên thất bại: ${err.message || 'Lỗi kết nối'}`);
     } finally {
       setIsProcessing(false);
       setProcessStatus('');
