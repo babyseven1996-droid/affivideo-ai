@@ -75,32 +75,35 @@ export default function CreateVideo({
     setProcessStatus('⏳ Đang bóc tách file video không watermark...')
 
     try {
-      // Sử dụng API công khai để lấy video thực tế từ TikTok/Douyin/Shorts
-      // Trong hàm xử lý lấy video (handleAnalyzeSourceVideo):
-const apiEndpoint = `https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`;
-const res = await fetch(apiEndpoint);
-const json = await res.json();
+      // Gọi API lấy video
+      const apiEndpoint = `https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`;
+      const res = await fetch(apiEndpoint);
+      const json = await res.json();
 
-if (json.code === 0 && json.data) {
-  const videoData = {
-    playUrl: json.data.play || json.data.wmplay,
-    cover: json.data.cover || json.data.origin_cover,
-    rawTitle: json.data.title || 'Video Reup Affiliate HOT',
-  };
-  // ... xử lý tiếp dữ liệu thành công
-} else {
-  // 💡 Kiểm tra nếu là link Douyin thì đưa ra gợi ý cụ thể cho bạn
-  if (targetUrl.includes('douyin.com')) {
-    onToast('⚠️ Douyin đang chặn API tự động. Bạn hãy tải video Douyin về máy trước hoặc dùng link TikTok để tool chạy mượt nhất nhé!');
-  } else {
-    onToast('❌ Không thể lấy dữ liệu video từ link TikTok này.');
-  }
-  setIsProcessing(false);
-  return;
-}
+      if (json.code === 0 && json.data) {
+        const videoData = {
+          playUrl: json.data.play || json.data.wmplay,
+          cover: json.data.cover || json.data.origin_cover,
+          rawTitle: json.data.title || 'Video Reup Affiliate HOT',
+        };
+        
+        // ... các xử lý tiếp theo của bạn ở đây ...
+        setIsProcessing(false);
+      } else {
+        onToast('❌ Không thể lấy dữ liệu video từ link này.');
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      // 💡 Bổ sung khối catch này để khớp với try bên trên
+      console.error('Lỗi kết nối API:', error);
+      onToast('❌ Đã xảy ra lỗi kết nối khi lấy video.');
+      setIsProcessing(false);
+    }
+  }; // <--- Đóng ngoặc của hàm handleAnalyzeSourceVideo
+
 
   // 2. REUP & LÁCH BẢN QUYỀN
-  const handleProcessReupVideo = async () => {
+     const handleProcessReupVideo = async () => {
     const targetUrl = cleanAndExtractUrl(sourceUrl)
     if (!targetUrl) {
       onToast('Vui lòng nhập liên kết video nguồn!')
