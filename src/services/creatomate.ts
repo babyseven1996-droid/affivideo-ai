@@ -1,13 +1,10 @@
 // src/services/creatomate.ts
 
-// src/services/creatomate.ts
-
 export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string> {
-  // Gán trực tiếp API Key vào đây để triệt tiêu hoàn toàn lỗi TypeScript
   const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a';
 
   try {
-    console.log('🛡️ Đang khởi tạo Render giữ nguyên độ phân giải gốc...');
+    console.log('🛡️ Đang khởi tạo Render Full HD 1080p (Nền mờ nghệ thuật + Video chính sắc nét)...');
 
     const response = await fetch('https://api.creatomate.com/v1/renders', {
       method: 'POST',
@@ -18,30 +15,42 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
       body: JSON.stringify({
         source: {
           output_format: 'mp4',
-          // 💡 QUAN TRỌNG: Đã bỏ width/height cố định để tự động lấy đúng độ phân giải gốc của video (giữ nguyên độ nét)
+          // 💡 BẮT BUỘC CÓ WIDTH & HEIGHT ĐỂ ÉP RENDER FULL HD (KHÔNG BAO GIỜ BỊ MỜ)
+          width: 1080,
+          height: 1920,
           frame_rate: 30,
           elements: [
-            // Lớp 1: Nền mờ nghệ thuật phía sau
+            // ==========================================
+            // LỚP 1: NỀN MỜ PHÍA SAU (Background Blur Layer)
+            // ==========================================
+            // - Phủ kín khung hình 9:16 (cover)
+            // - Làm mờ mạnh (blur_radius: 50) + Tối nền (brightness: '50%') để làm nổi bật video chính
             {
               type: 'video',
               source: videoUrl,
               time: 0,
               duration: null,
               fit: 'cover',
-              blur_radius: 40,
-              brightness: '60%',
+              blur_radius: 50,
+              brightness: '50%',
               volume: '0%',
             },
-            // Lớp 2: Video chính phía trước (Độ nét căng 100%, lật gương + tăng tốc + zoom cắt viền)
+
+            // ==========================================
+            // LỚP 2: VIDEO CHÍNH / NHÂN VẬT (Foreground - Nét căng)
+            // ==========================================
+            // - Giữ nguyên tỷ lệ gốc, không bị kéo dãn hay vỡ hình (contain)
+            // - Lật gương hoàn toàn (x_scale: '-100%') chống quét nhận diện hình ảnh
+            // - Tăng tốc nhẹ 1.04x (speed: '104%') chống quét âm thanh Content ID
             {
               type: 'video',
               source: videoUrl,
               time: 0,
               duration: null,
-              fit: 'cover',       // Khớp tràn viền hoàn hảo, không bị bóp méo hay vỡ hình
-              scale: '104%',      // Zoom nhẹ 4% cắt sạch logo góc
-              speed: '104%',      // Tăng tốc nhẹ 1.04x lách bản quyền âm thanh
-              x_scale: '-100%',   // Lật gương hoàn toàn (Flip Horizontal)
+              fit: 'contain',
+              scale: '100%',
+              speed: '104%',
+              x_scale: '-100%', // 👈 Lật hình hoàn hảo ở đây
             },
           ],
         },
@@ -51,7 +60,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
     const data = await response.json();
 
     if (!response.ok) {
-      console.warn('⚠️ API Creatomate phản hồi lỗi, dùng video gốc dự phòng:', data);
+      console.warn('⚠️ API Creatomate lỗi, dùng video gốc dự phòng:', data);
       return videoUrl;
     }
 
@@ -61,7 +70,7 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
     return await pollRenderStatus(renderId, apiKey, videoUrl);
 
   } catch (error) {
-    console.error('❌ Lỗi kết nối xào nấu video:', error);
+    console.error('❌ Lỗi xào nấu video:', error);
     return videoUrl;
   }
 }
@@ -84,7 +93,7 @@ async function pollRenderStatus(renderId: string, apiKey: string, fallbackUrl: s
       console.log(`⌛ [Lần ${attempts}/${maxAttempts}] Trạng thái Render: ${render.status}`);
 
       if (render.status === 'succeeded' && render.url) {
-        console.log('🎉 XÀO NẤU THÀNH CÔNG! Link video nét căng:', render.url);
+        console.log('🎉 XÀO NẤU THÀNH CÔNG! Link video Full HD nét căng:', render.url);
         return render.url;
       }
       if (render.status === 'failed') {
