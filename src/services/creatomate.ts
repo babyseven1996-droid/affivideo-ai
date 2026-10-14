@@ -98,8 +98,9 @@ export async function renderAntiCopyrightVideo(options: RenderOptions) {
   }
 
   // 2. Vòng lặp kiểm tra trạng thái (Polling loop)
+ // 💡 Tăng thời gian chờ lên 100 lần x 3 giây = 5 phút và thêm log theo dõi
   let attempts = 0;
-  while (attempts < 60) {
+  while (attempts < 100) {
     await new Promise((resolve) => setTimeout(resolve, 3000));
     attempts++;
 
@@ -112,17 +113,20 @@ export async function renderAntiCopyrightVideo(options: RenderOptions) {
     if (statusRes.ok) {
       const statusData = await statusRes.json();
       renderObj = Array.isArray(statusData) ? statusData[0] : statusData;
+      
+      // In trạng thái ra Console để kiểm tra tiến độ (planned, rendering, completed...)
+      console.log(`Lần thử ${attempts} - Trạng thái render:`, renderObj.status);
 
       if (renderObj.status === 'completed') {
         return renderObj; 
       }
       if (renderObj.status === 'failed') {
         console.error("Chi tiết lỗi Creatomate trả về:", renderObj);
-        const errDetail = renderObj.error_message || renderObj.message || 'Lỗi không xác định từ server Creatomate';
+        const errDetail = renderObj.error_message || renderObj.message || 'Lỗi từ server Creatomate';
         throw new Error(`Render thất bại: ${errDetail}`);
       }
     }
   }
 
-  throw new Error('Quá trình render video quá thời gian chờ (Timeout).');
+  throw new Error('Quá trình render video quá thời gian chờ (Timeout - Quá 5 phút).');
 }
