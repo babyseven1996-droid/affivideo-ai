@@ -42,7 +42,7 @@ export default function CreateVideo({
     else console.log(msg);
   };
 
-  // Hàm làm sạch link
+  // Hàm làm sạch & chuẩn hóa link (Hỗ trợ tự động convert link Douyin dạng modal_id sang dạng /video/)
   const cleanAndExtractUrl = (rawUrl: string): string => {
     if (!rawUrl) return '';
     let cleaned = rawUrl.trim();
@@ -50,12 +50,21 @@ export default function CreateVideo({
     if (match && match.length > 0) {
       let url = match[0];
       url = url.replace(/[)}\],，。！？;]+$/, '');
+
+      // 💡 Xử lý tự động chuyển đổi link Douyin dạng jingxuan?modal_id= thành /video/
+      if (url.includes('douyin.com') && url.includes('modal_id=')) {
+        const modalMatch = url.match(/modal_id=(\d+)/);
+        if (modalMatch && modalMatch[1]) {
+          url = `https://www.douyin.com/video/${modalMatch[1]}`;
+        }
+      }
+
       return url;
     }
     return cleaned;
   };
 
-  // Bước 1: Lấy video thật từ TikTok qua API
+  // Bước 1: Lấy video thật từ TikTok / Douyin qua API
   const handleAnalyzeSourceVideo = async () => {
     const targetUrl = cleanAndExtractUrl(sourceUrl);
     if (!targetUrl) {
@@ -67,6 +76,11 @@ export default function CreateVideo({
     setProcessStatus('Đang kết nối lấy dữ liệu video gốc...');
 
     try {
+      // 💡 Nếu là link rút gọn Douyin, nhắc nhở người dùng lấy link đầy đủ trên trình duyệt
+      if (targetUrl.includes('v.douyin.com')) {
+        notify('⚠️ Link rút gọn Douyin (v.douyin.com) hay bị chặn. Khuyên bạn nên mở trên web máy tính và lấy link đầy đủ (www.douyin.com/video/...)');
+      }
+
       const apiEndpoint = `https://www.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}&hd=1`;
       const res = await fetch(apiEndpoint);
       const json = await res.json();
@@ -84,7 +98,11 @@ export default function CreateVideo({
         }
         notify('🎉 Lấy video gốc thành công!');
       } else {
-        notify('❌ Không thể lấy dữ liệu video từ link này.');
+        if (targetUrl.includes('douyin.com')) {
+          notify('❌ Douyin đang bảo mật chặt. Bạn hãy thử copy link đầy đủ trên trình duyệt web nhé!');
+        } else {
+          notify('❌ Không thể lấy dữ liệu video từ link này.');
+        }
       }
     } catch (error) {
       console.error('Lỗi phân tích video:', error);
