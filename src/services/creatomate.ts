@@ -11,41 +11,41 @@ export interface RenderOptions {
 }
 
 export async function renderAntiCopyrightVideo(options: RenderOptions) {
-  // Đọc API Key từ môi trường Vite hoặc môi trường React App
   const CREATOMATE_API_KEY =
     (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_CREATOMATE_API_KEY) ||
     'YOUR_CREATOMATE_API_KEY';
+
   const speedVal = options.speed ?? 1.04;
   const isFlip = options.enableFlip ?? true;
   const isMute = options.muteOriginalAudio ?? true;
 
-  // 1. Cấu hình lớp Video Gốc
+  // 1. Cấu hình mảng các lớp video gốc
   const elements: any[] = [
     {
       type: 'video',
       source: options.videoUrl,
-      volume: isMute ? 0 : 100, // 0 = Tắt sạch âm thanh gốc
+      volume: isMute ? '0%' : '100%', // Tắt tiếng hoặc giữ nguyên tiếng gốc
       speed: speedVal,
       horizontal_flip: isFlip,
       fit: 'cover',
     },
   ];
 
-  // 2. Thêm Nhạc Nền MP3 (âm lượng vừa phải 18%)
+  // 2. Thêm Nhạc Nền MP3 (nếu người dùng đã upload)
   if (options.bgMusicUrl && options.bgMusicUrl.trim() !== '') {
     elements.push({
       type: 'audio',
       source: options.bgMusicUrl.trim(),
-      volume: 18,
+      volume: '18%', // Âm lượng nhạc nền 18% vừa phải
     });
   }
 
-  // 3. Thêm Giọng Đọc Voice AI (âm lượng 100%)
+  // 3. Thêm Giọng Đọc Voice AI / TTS (nếu người dùng đã upload)
   if (options.voiceUrl && options.voiceUrl.trim() !== '') {
     elements.push({
       type: 'audio',
       source: options.voiceUrl.trim(),
-      volume: 100,
+      volume: '100%', // Âm lượng voice rõ nét 100%
     });
   }
 
@@ -78,7 +78,11 @@ export async function renderAntiCopyrightVideo(options: RenderOptions) {
         resolution: '1080p',
         fps: 30,
       },
-      elements: elements,
+      // 💡 Đưa elements vào trong cấu trúc source composition chuẩn của Creatomate
+      source: {
+        type: 'composition',
+        elements: elements,
+      },
     }),
   });
 
@@ -89,7 +93,6 @@ export async function renderAntiCopyrightVideo(options: RenderOptions) {
 
   const resultData = await response.json();
   
-  // Creatomate trả về danh sách render dạng mảng
   if (Array.isArray(resultData) && resultData.length > 0) {
     return resultData[0];
   }
