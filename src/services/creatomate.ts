@@ -1,11 +1,11 @@
 // src/services/creatomate.ts
 
 export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string> {
-  // 🔑 Hãy đảm bảo dán đúng Secret API Key thật của bạn vào đây:
-  const apiKey = import.meta.env.VITE_CREATOMATE_API_KEY || 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a3ea7dc6e8213c1acf920952bc';
+  // 🔑 Thay đoạn này bằng API Key thật của bạn:
+  const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a3ea7dc6e8213c1acf920952bcaf7841a3ea7dc6e8213c1acf920952bc';
 
   try {
-    console.log('🛡️ Đang khởi tạo Render Chuẩn HD (Nền mờ + Video chính nét 100%)...');
+    console.log('🛡️ Đang khởi tạo Render Kỹ thuật số 1 (Dynamic Zoom + Nền mờ Full HD)...');
 
     const response = await fetch('https://api.creatomate.com/v1/renders', {
       method: 'POST',
@@ -16,15 +16,13 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
       body: JSON.stringify({
         source: {
           output_format: 'mp4',
-          // Ép chuẩn khung hình Full HD 1080x1920
           width: 1080,
           height: 1920,
           frame_rate: 30,
-          // 💡 QUAN TRỌNG: Thiết lập chất lượng render tối đa (CRF 18 = Siêu nét, ít nén)
-          crf: 18, 
+          crf: 18, // Ép nét căng chuẩn HD
           elements: [
             // ==========================================
-            // LỚP 1: NỀN MỜ PHÍA SAU (Background Blur)
+            // LỚP 1: NỀN MỜ NGHỆ THUẬT PHÍA SAU
             // ==========================================
             {
               type: 'video',
@@ -32,23 +30,35 @@ export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string
               time: 0,
               duration: null,
               fit: 'cover',
-              blur_radius: 50,      // Mờ mịn nền
-              brightness: '50%',    // Làm tối nhẹ để làm nổi bật lớp trên
+              blur_radius: 50,
+              brightness: '50%',
               volume: '0%',
             },
 
             // ==========================================
-            // LỚP 2: VIDEO CHÍNH / NHÂN VẬT (Foreground - Nét Căng HD)
+            // LỚP 2: VIDEO CHÍNH (Áp dụng Kỹ thuật số 1)
             // ==========================================
             {
               type: 'video',
               source: videoUrl,
               time: 0,
               duration: null,
-              fit: 'contain',       // Giữ chuẩn tỷ lệ, không vỡ hình
-              scale: '100%',
-              speed: '104%',        // Tăng tốc nhẹ 1.04x lách âm thanh
-              x_scale: '-100%',     // Lật gương hoàn toàn lách điểm ảnh
+              fit: 'contain',
+              speed: '104%',      // Lách âm thanh
+              x_scale: '-100%',   // Lật gương hình ảnh
+              
+              // 💡 KỸ THUẬT 1: HIỆU ỨNG PHÓNG TO ĐỘNG (DYNAMIC ZOOM)
+              // Video sẽ tự động zoom lớn dần đều từ 100% lên 112% xuyên suốt thời lượng video
+              animations: [
+                {
+                  type: 'scale',
+                  easing: 'linear',
+                  start_scale: '100%',
+                  end_scale: '112%',
+                  duration: '100%', // Trải đều từ đầu đến cuối video
+                  fade: false
+                }
+              ]
             },
           ],
         },
@@ -91,11 +101,11 @@ async function pollRenderStatus(renderId: string, apiKey: string, fallbackUrl: s
       console.log(`⌛ [Lần ${attempts}/${maxAttempts}] Trạng thái Render: ${render.status}`);
 
       if (render.status === 'succeeded' && render.url) {
-        console.log('🎉 XÀO NẤU THÀNH CÔNG! Link video chuẩn HD nét căng:', render.url);
+        console.log('🎉 XÀO NẤU THÀNH CÔNG VỚI DYNAMIC ZOOM:', render.url);
         return render.url;
       }
       if (render.status === 'failed') {
-        console.error('❌ Creatomate render thất bại:', render.error_message);
+        console.error('❌ Render thất bại:', render.error_message);
         return fallbackUrl;
       }
     } catch (err) {
