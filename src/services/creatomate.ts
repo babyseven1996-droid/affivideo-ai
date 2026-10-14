@@ -1,7 +1,10 @@
 // src/services/creatomate.ts
 
+// src/services/creatomate.ts
+
 export async function renderAntiCopyrightVideo(videoUrl: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_CREATOMATE_API_KEY || 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a';
+  // Gán trực tiếp API Key vào đây để triệt tiêu hoàn toàn lỗi TypeScript
+  const apiKey = 'c61dcb2f5bda4db88ce4b91a401daf26b1160b954964fbd0477d5b1bbd31f940af7841a';
 
   try {
     console.log('🛡️ Đang khởi tạo Render giữ nguyên độ phân giải gốc...');
