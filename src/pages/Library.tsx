@@ -118,7 +118,7 @@ export default function Library({ videos, onDelete, onToast }: LibraryProps) {
               {/* Thẻ Video */}
               <div style={{ position: 'relative', width: '100%', paddingTop: '133%', backgroundColor: '#000' }}>
                 <video
-                  src={video.videoUrl}
+                  src={video.video_url || video.videoUrl}
                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                   controls
                 />
